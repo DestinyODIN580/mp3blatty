@@ -3,3 +3,8 @@ tracks/
 
 # file eseguibile
 mp3blatty
+
+# file temporanei
+playlistnames.txt
+tracks.txt
+trackinfo.txt
