@@ -4,6 +4,9 @@ tracks/
 # file eseguibile
 mp3blatty
 
+# eventuali playlist
+*.ply
+
 # file temporanei
 playlistnames.txt
 tracks.txt
