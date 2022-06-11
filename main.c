@@ -1093,6 +1093,7 @@ void playlistsinmenu (int track)
             case KEY_RIGHT:
             case KEY_LEFT:
             case '\t':
+                free (songs);
                 return ;
                 break;
 
@@ -1107,7 +1108,10 @@ void playlistsinmenu (int track)
         mvwprintw (info_win, 1, 3 + c, " ");
     mvwprintw (info_win, 1, 2, "%d/%d", highlight, n_tracks);
     wrefresh (info_win);
+
     }
+
+
 }
 
 void addSongtoPlaylist (void)
@@ -1473,7 +1477,13 @@ void addSongtoPlaylist (void)
     for (i = 0; *(mergedSongs + i) != NULL ; i++)
         fprintf (fIn, "%s\n", *(mergedSongs + i));
     fclose (fIn);
-
+    
+    free (mergedSongs);
+    free (inputSongs);
+    free (fileSongs);
+    free (v);
+    free (m);
+    
 
     return ;
 }
