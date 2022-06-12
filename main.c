@@ -9,10 +9,10 @@
 #define WIDTH 60
 #define HEIGHT 12
 
-char *tracklist = "tracks.txt"; /* file con la lista delle tracce */
-char *trackinfofile = "trackinfo.txt"; /* file con le info della traccia */
-char *playlistfile = "playlistnames.txt"; /* file con la lista delle playlist */
-char *trackplay = "mpv ";   /* lettore */
+char *tracklist = "tracks.txt";          /* file con la lista delle tracce */
+char *trackinfofile = "trackinfo.txt";   /* file con le info della traccia */
+char *playlistfile = "playlistnames.txt";/* file con la lista delle playlist */
+char *trackplay = "mpv ";                /* lettore */
 
 char buffer[L]; /* buffer generico */
 
@@ -63,21 +63,17 @@ void displayplaylists (void);   /* mostra le playlist */
 void playlistsinmenu (int);     /* stampa le tracce della playlist */
 void addSongtoPlaylist (void);  /* aggiunge tracce a una playlist esistente */
 
-char **choisesinit (void);
-char **playlistinit (void);
-char **matrixgenerator (char *, char **);
+char **choisesinit (void);      /* inizializzatore delle tracce */
+char **playlistinit (void);     /* inizializzatore delle playlist */
+char **matrixgenerator (char *, char **);   /* genera matrici da file */
 
 int system (char const *);
 int scanplaylists (void);        /* controlla per nuove playlist */
 
-void *tracksfile (void);    /* crea il file con i titoli delle tracce */
-FILE *trackinfo (void); /* monitora il file con le info della traccia */
-
-
 int main (void)
 {
 
-    unsigned long int randomnum;
+    unsigned long int randomnum;    /* numero casuale */
     unsigned int rand;
 
     int highlight = 1;  /* cursore */
@@ -86,7 +82,7 @@ int main (void)
     int c;              /* carattere in input */
     int i;              /* contatori */
 
-    FILE *fInfo;         /* file delle informazioni */
+    FILE *fInfo;        /* file delle informazioni */
 
     randomnum = 1;
     choice = 0;
@@ -226,7 +222,7 @@ int main (void)
 
             /* spostamento delle tracce da Downloads a tracks */
             case KEY_F(6):
-                system ("cd ../Downloads && mv *.mp4 ../musica/tracks >& \
+                system ("pd=$(pwd); cd $HOME/Downloads; mv *.mp4 $pd/tracks >& \
                 /dev/null");
                 /* non mettere break e'volontario, come l'ordine dei case */
 
@@ -247,7 +243,6 @@ int main (void)
             /* nuova playlist */
             case KEY_F(7):
                 createPlaylist ();
-                //playlists = playlistinit ();
                 break;
 
             /* apre la play_win */
@@ -445,11 +440,10 @@ int main (void)
 char **choisesinit (void)
 {
     char *localBuffer;
-
-    int c;
-    int i, j;
-
-    FILE *f;
+    int c;              /* carattere */
+    int i, j;           /* contatori */
+    
+    FILE *f;            /* file */
 
 
     *buffer = '\0';
@@ -460,15 +454,14 @@ char **choisesinit (void)
         exit (-1);
     }
 
+    /* TODO: 1. se non esitono file .mp4 2. includere altri formati */
     /* creazione del file contenenti i titoli */
     strcpy (buffer, "(cd tracks/ && ls *.mp4 > ../");
     strcat (buffer, tracklist);
     strcat (buffer, " && cd ..)");
     system (buffer);
-
     fflush (f);
     fclose (f);
-
 
     /* riapro il file delle tracce in lettura */
     f = fopen (tracklist, "r");
@@ -1029,7 +1022,6 @@ void playlistsinmenu (int track)
     FILE *f;
 
     songs = NULL;
-
 
 
     songs = matrixgenerator (playlists[track - 1], songs);
