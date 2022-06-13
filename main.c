@@ -487,12 +487,29 @@ char **choisesinit (void)
 
     /* TODO: 1. se non esitono file .mp4 2. includere altri formati */
     /* creazione del file contenenti i titoli */
-    strcpy (buffer, "(cd tracks/ && ls *.mp* > ../");
+    strcpy (buffer, "cd tracks/; ls *.mp* >&/dev/null; if [[ $? -ne 0 ]]; then\
+            (cd .. && touch ERR.txt); else ls *.mp* > ../");
     strcat (buffer, tracklist);
-    strcat (buffer, " && cd ..)");
+    strcat (buffer, "; fi");
     system (buffer);
     fflush (f);
     fclose (f);
+
+    if ((f = fopen ("ERR.txt", "r")) != NULL)
+    {
+        mvprintw (starty - 1, startx, "No tracks were found. Press any key to exit.");
+        box (menu_win, 0, 0);
+        wrefresh (menu_win);
+        refresh ();
+        
+        while ((c = wgetch (menu_win)) == ERR);
+        strcpy (buffer, "rm ERR.txt ");
+        strcat (buffer, tracklist);
+        system (buffer);
+
+        endwin ();
+        exit (-2);
+    }
 
     /* riapro il file delle tracce in lettura */
     f = fopen (tracklist, "r");
