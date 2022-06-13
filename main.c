@@ -29,8 +29,8 @@ int trackplaying = 0;   /* flag */
 int trackindex = -1;    /* indice della traccia corrente */
 
 /* opzioni */
-int n_options = 12;
-char *options[12] =
+int n_options = 13;
+char *options[13] =
 {
   "<F1>  Play",
   "<F2>  Pause",
@@ -41,6 +41,7 @@ char *options[12] =
   "<F7>  New playlist",
   "<F8>  Playlist menu",
   "<F9>  Add songs to ply",
+  "<F10> Shuffle mode",
   "<F11> Prev",
   "<F12> Next",
   "<TAB> Quit",
@@ -76,6 +77,7 @@ int main (void)
     unsigned long int randomnum;    /* numero casuale */
     unsigned int rand;
 
+    int shuffleMode;
     int highlight = 1;  /* cursore */
     int choice = 0;     /* traccia scelta */
     int isPaused;
@@ -85,7 +87,7 @@ int main (void)
     FILE *fInfo;        /* file delle informazioni */
 
     randomnum = 1;
-    choice = 0;
+    choice = shuffleMode = 0;
     
 
     /* inzializzazione di ncurses */
@@ -264,6 +266,25 @@ int main (void)
                 continue;
                 break;
 
+            case KEY_F(10):
+                if (!shuffleMode)
+                {       
+                    move (starty - 1, startx);
+                    clrtoeol ();
+                    printw ("Shuffle mode ON");
+                    refresh ();
+                    shuffleMode = 1;
+                }
+                else
+                {
+                    move (starty - 1, startx);
+                    clrtoeol ();
+                    printw ("Shuffle mode OFF");
+                    refresh ();
+                    shuffleMode = 0;
+                }
+                break;
+
             /* traccia precedente */
             case KEY_F(11):
                 if (highlight == 1)
@@ -362,14 +383,24 @@ int main (void)
             *buffer = '\0';
             c = '\n';
 
-        /* scorro alla traccia successiva */
-        if (choice < n_choices)
-        {
-            choice++;
-            highlight = trackindex = choice;
-        }
-        else 
-            highlight = choice = trackindex = 1;
+            /* scorro alla traccia successiva */
+            if (!shuffleMode)
+            {
+                if (choice < n_choices)
+                {
+                    choice++;
+                    highlight = trackindex = choice;
+                }
+                else 
+                    highlight = choice = trackindex = 1;
+            }
+            else
+            {
+                if (rand > 0)
+                    highlight = trackindex = choice = rand;
+                else
+                    highlight = trackindex = choice = 1;
+            }
         }
     }
 
