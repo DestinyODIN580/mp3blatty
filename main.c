@@ -224,7 +224,7 @@ int main (void)
 
             /* spostamento delle tracce da Downloads a tracks */
             case KEY_F(6):
-                system ("pd=$(pwd); cd $HOME/Downloads; mv *.mp4 $pd/tracks >& \
+                system ("pd=$(pwd); cd $HOME/Downloads; mv *.mp* $pd/tracks >& \
                 /dev/null");
                 /* non mettere break e'volontario, come l'ordine dei case */
 
@@ -487,7 +487,7 @@ char **choisesinit (void)
 
     /* TODO: 1. se non esitono file .mp4 2. includere altri formati */
     /* creazione del file contenenti i titoli */
-    strcpy (buffer, "(cd tracks/ && ls *.mp4 > ../");
+    strcpy (buffer, "(cd tracks/ && ls *.mp* > ../");
     strcat (buffer, tracklist);
     strcat (buffer, " && cd ..)");
     system (buffer);
