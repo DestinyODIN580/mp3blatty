@@ -324,207 +324,199 @@ int main (void)
             default:
                 wrefresh (menu_win);
                 break;
-    }
-
-    /* stampa della traccia highlight in info_win */
-    wmove (info_win, 1, 2);
-    wclrtoeol (info_win);
-    box (info_win, 0, 0);
-    wprintw (info_win, "%d/%d", highlight, n_choices);
-    wmove (info_win, 1, (WIDTH - 9) / 2);
-
-    if (!isPaused)
-        wprintw (info_win, "Playing");
-    else if (isPaused == 1)
-        wprintw (info_win, "Paused");
-
-
-    /* se una traccia e' riprodotta stampo il suo indice */
-    if (trackplaying /* && trackindex != -1 */)
-    {
-        wattron (info_win, A_BLINK);
-        if (trackindex < 10)
-        {
-          wmove (info_win, 1, WIDTH - 6);
-          wprintw (info_win, "%d/%d", trackindex, n_choices);
         }
-        else if (trackindex < 100)
-        {
-          wmove (info_win, 1, WIDTH - 7);
-          wprintw (info_win, "%d/%d", trackindex, n_choices);
-        }
-        /* ... */
-        wattroff (info_win, A_BLINK);
-    }
-    else
-    {
-        wmove (info_win, 1, (WIDTH - 9) / 2);
-        wclrtoeol (info_win);
-        wmove (info_win, 2, 2);
+
+        /* stampa della traccia highlight in info_win */
+        wmove (info_win, 1, 2);
         wclrtoeol (info_win);
         box (info_win, 0, 0);
-    }
-    wrefresh (info_win);
+        wprintw (info_win, "%d/%d", highlight, n_choices);
+        wmove (info_win, 1, (WIDTH - 9) / 2);
+
+        if (!isPaused)
+            wprintw (info_win, "Playing");
+        else if (isPaused == 1)
+            wprintw (info_win, "Paused");
 
 
-
-    /* ristampa tutto per tenere aggiornato */
-    print_menu (menu_win, highlight, choises, n_choices, HEIGHT, WIDTH);
-
-    /* esco dal programma */
-    if (choice == -1)
-        break;
-
-    /* controllo fine traccia */
-    if (trackplaying && c != '\n')
-    {
-        fInfo = fopen (trackinfofile, "r");
-        fseek (fInfo, -6, SEEK_END);
-        for (i = 0; i < 4; i++)
-        buffer[i] = fgetc (fInfo);
-        buffer[i] = '\0';
-
-        /* fine traccia */
-        if (!strcmp (buffer, "file"))
+        /* se una traccia e' riprodotta stampo il suo indice */
+        if (trackplaying /* && trackindex != -1 */)
         {
-            trackplaying = 0;
-            *buffer = '\0';
-            c = '\n';
-
-            /* scorro alla traccia successiva */
-            if (!shuffleMode)
+            wattron (info_win, A_BLINK);
+            if (trackindex < 10)
             {
-                if (choice < n_choices)
-                {
-                    choice++;
-                    highlight = trackindex = choice;
-                }
-                else 
-                    highlight = choice = trackindex = 1;
+            wmove (info_win, 1, WIDTH - 6);
+            wprintw (info_win, "%d/%d", trackindex, n_choices);
             }
-            else
+            else if (trackindex < 100)
             {
-                if (rand > 0)
-                    highlight = trackindex = choice = rand;
+            wmove (info_win, 1, WIDTH - 7);
+            wprintw (info_win, "%d/%d", trackindex, n_choices);
+            }
+            /* ... */
+            wattroff (info_win, A_BLINK);
+        }
+        else
+        {
+            wmove (info_win, 1, (WIDTH - 9) / 2);
+            wclrtoeol (info_win);
+            wmove (info_win, 2, 2);
+            wclrtoeol (info_win);
+            box (info_win, 0, 0);
+        }
+        wrefresh (info_win);
+
+        /* ristampa tutto per tenere aggiornato */
+        print_menu (menu_win, highlight, choises, n_choices, HEIGHT, WIDTH);
+
+        /* esco dal programma */
+        if (choice == -1)
+            break;
+
+        /* controllo fine traccia */
+        if (trackplaying && c != '\n')
+        {
+            fInfo = fopen (trackinfofile, "r");
+            fseek (fInfo, -6, SEEK_END);
+            for (i = 0; i < 4; i++)
+                buffer[i] = fgetc (fInfo);
+            buffer[i] = '\0';   
+
+            /* fine traccia */
+            if (!strcmp (buffer, "file"))
+            {
+                trackplaying = 0;
+                *buffer = '\0';
+                c = '\n';
+
+                /* scorro alla traccia successiva */
+                if (!shuffleMode)
+                {
+                    if (choice < n_choices)
+                    {
+                        choice++;
+                        highlight = trackindex = choice;
+                    }
+                    else 
+                        highlight = choice = trackindex = 1;
+                }
                 else
-                    highlight = trackindex = choice = 1;
-            }
-        } 
-
-        else 
-        {
-            fclose (fInfo);
-
-            strcpy (buffer, "echo '{ \"command\": [\"get_property_string\", \"time-pos\"]\
-            }\' | socat - /tmp/mpvsocket >& ");  
-            strcat (buffer, timingfile);
-            system (buffer);
-
-            if ((fInfo = fopen ("posizione.txt", "r")) != NULL)
-            {
-                for (i = 0; (c = fgetc (fInfo)) != EOF; i++)
-                    buffer[i] = c;
-                buffer[i] = '\0';
-
-                if (strstr (buffer, "socat") == NULL)
                 {
-
-
-                    strcpy (buffer, buffer + 9);
-                
-                    for (i = 0; buffer[i] != '\0' && buffer[i] != '.'; i++);
-                    buffer[i] = '\0';     
-
-                    wmove (time_win, 1, 5);
-                    wclrtoeol (menu_win);
-                    i = atoi (buffer);
-                    wattron (time_win, A_BOLD);
-                    wprintw (time_win, "%02d:%02d:%02d", i / 3600, i / 60, i % 60);
-                    wattroff (time_win, A_BOLD);
-                    box (time_win, 0, 0);
+                    if (rand > 0)
+                        highlight = trackindex = choice = rand;
+                    else
+                        highlight = trackindex = choice = 1;
                 }
-
+            } 
+            else 
+            {
                 fclose (fInfo);
-                strcpy (buffer, "echo '{ \"command\": [\"get_property_string\", \"duration\"]\
+
+                strcpy (buffer, "echo '{ \"command\": [\"get_property_string\", \"time-pos\"]\
                 }\' | socat - /tmp/mpvsocket >& ");  
                 strcat (buffer, timingfile);
                 system (buffer);
-                         
-                fInfo = fopen ("posizione.txt", "r");
 
-                for (i = 0; (c = fgetc (fInfo)) != EOF; i++)
-                    buffer[i] = c;
-                buffer[i] = '\0';
-
-
-                if (strstr (buffer, "socat") == NULL)
+                if ((fInfo = fopen ("posizione.txt", "r")) != NULL)
                 {
-                    for (i = 0; buffer[i + 9] != '\0'; i++)
-                        buffer[i] = buffer[i + 9];
+                    for (i = 0; (c = fgetc (fInfo)) != EOF; i++)
+                        buffer[i] = c;
                     buffer[i] = '\0';
 
-                    for (i = 0; buffer[i] != '\0' && buffer[i] != '.'; i++);
-                    buffer[i] = '\0';     
+                    if (strstr (buffer, "socat") == NULL)
+                    {
+                        strcpy (buffer, buffer + 9);
+                
+                        for (i = 0; buffer[i] != '\0' && buffer[i] != '.'; i++);
+                        buffer[i] = '\0';     
+
+                        wmove (time_win, 1, 5);
+                        wclrtoeol (menu_win);
+                        i = atoi (buffer);
+                        wattron (time_win, A_BOLD);
+                        wprintw (time_win, "%02d:%02d:%02d", i / 3600, i / 60, i % 60);
+                        wattroff (time_win, A_BOLD);
+                        box (time_win, 0, 0);
+                    }
+
+                    fclose (fInfo);
+                    strcpy (buffer, "echo '{ \"command\": [\"get_property_string\", \"duration\"]\
+                    }\' | socat - /tmp/mpvsocket >& ");  
+                    strcat (buffer, timingfile);
+                    system (buffer);
+                         
+                    fInfo = fopen ("posizione.txt", "r");
+
+                    for (i = 0; (c = fgetc (fInfo)) != EOF; i++)
+                        buffer[i] = c;
+                    buffer[i] = '\0';
+
+                    if (strstr (buffer, "socat") == NULL)
+                    {
+                        for (i = 0; buffer[i + 9] != '\0'; i++)
+                            buffer[i] = buffer[i + 9];
+                        buffer[i] = '\0';
+
+                        for (i = 0; buffer[i] != '\0' && buffer[i] != '.'; i++);
+                        buffer[i] = '\0';     
                         
-                    wmove (time_win, 1, 16);
-                    i = atoi (buffer);
-                    wattron (time_win, A_BOLD);
-                    wprintw (time_win, "%02d:%02d:%02d", i / 3600, i / 60, i % 60);
-                    wattroff (time_win, A_BOLD);
+                        wmove (time_win, 1, 16);
+                        i = atoi (buffer);
+                        wattron (time_win, A_BOLD);
+                        wprintw (time_win, "%02d:%02d:%02d", i / 3600, i / 60, i % 60);
+                        wattroff (time_win, A_BOLD);
+                    }
                 }
+                else
+                {
+                    wmove (time_win, 1, 5),
+                    wclrtoeol (time_win);
+                    wprintw (time_win, "--:--:-- / --:--:--");
+                    box (time_win, 0, 0);
+                } 
+                wrefresh (time_win);
             }
-            else
-            {
-                wmove (time_win, 1, 5),
-                wclrtoeol (time_win);
-                wprintw (time_win, "--:--:-- / --:--:--");
-                box (time_win, 0, 0);
-            } 
-            wrefresh (time_win);
+            fclose (fInfo);
         }
-        fclose (fInfo);
-    }
-    else
-    {
-        wmove (time_win, 1, 5),
-        wclrtoeol (time_win);
-        wprintw (time_win, "--:--:-- / --:--:--");
-        box (time_win, 0, 0);
-    } 
-    wrefresh (time_win);
+        else
+        {
+            wmove (time_win, 1, 5),
+            wclrtoeol (time_win);
+            wprintw (time_win, "--:--:-- / --:--:--");
+            box (time_win, 0, 0);
+        } 
+        wrefresh (time_win);
 
+        /* traccia selezionata */
+        if (c == '\n')
+        {
+            trackplaying = 1;
+            isPaused = 0;
 
-    /* traccia selezionata */
-    if (c == '\n')
-    {
-        trackplaying = 1;
-        isPaused = 0;
+            system ("killall mpv >& /dev/null");
 
-        system ("killall mpv >& /dev/null");
+            /* resetto il file */
+            fInfo = fopen (trackinfofile, "w");
+            fclose (fInfo);
 
-        /* resetto il file */
-        fInfo = fopen (trackinfofile, "w");
-        fclose (fInfo);
+            /* mpv --flags... tracks/"%s.mp4"> trackinfo.txt & */
+            refresh ();
+            strcpy (buffer, trackplay);
+            strcat (buffer, " --input-ipc-server=/tmp/mpvsocket tracks/\"");
+            strcat (buffer, choises[choice - 1]);
+            strcat (buffer, "\" >& ");// > "); // &
+            strcat (buffer, trackinfofile);
+            strcat (buffer, " &");
+            system (buffer);
 
-        /* mpv --flags... tracks/"%s.mp4"> trackinfo.txt & */
-        //move (-4, 0);
-        refresh ();
-        strcpy (buffer, trackplay);
-        strcat (buffer, " --input-ipc-server=/tmp/mpvsocket tracks/\"");
-        strcat (buffer, choises[choice - 1]);
-        strcat (buffer, "\" >& ");// > "); // &
-        strcat (buffer, trackinfofile);
-        strcat (buffer, " &");
-        system (buffer);
-
-        /* stampo la traccia avviata in info_win */
-        wmove (info_win, 2, 2);
-        wclrtoeol (info_win);
-        box (info_win, 0, 0);
-        wattron (info_win, A_BLINK);
-        wprintw (info_win, "-");
-        wattroff (info_win, A_BLINK);
-        wprintw (info_win, " ");
+            /* stampo la traccia avviata in info_win */
+            wmove (info_win, 2, 2);
+            wclrtoeol (info_win);
+            box (info_win, 0, 0);
+            wattron (info_win, A_BLINK);
+            wprintw (info_win, "-");
+            wattroff (info_win, A_BLINK);
+            wprintw (info_win, " ");
 
 
             for (i = 0; choises[choice - 1][i] != '\0' && i < (WIDTH - 10); i++)
