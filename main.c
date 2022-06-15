@@ -12,6 +12,7 @@
 char *tracklist = "tracks.txt";          /* file con la lista delle tracce */
 char *trackinfofile = "trackinfo.txt";   /* file con le info della traccia */
 char *playlistfile = "playlistnames.txt";/* file con la lista delle playlist */
+char *timingfile = "posizione.txt";      /* file con il tempo della traccia */
 char *trackplay = "mpv ";                /* lettore */
 
 char buffer[L]; /* buffer generico */
@@ -29,8 +30,8 @@ int trackplaying = 0;   /* flag */
 int trackindex = -1;    /* indice della traccia corrente */
 
 /* opzioni */
-int n_options = 13;
-char *options[13] =
+int n_options = 12;
+char *options[12] =
 {
   "<F1>  Play",
   "<F2>  Pause",
@@ -44,7 +45,7 @@ char *options[13] =
   "<F10> Shuffle mode",
   "<F11> Prev",
   "<F12> Next",
-  "<TAB> Quit",
+  //"<TAB> Quit",
 };
 
 int n_choices = 0;      /* numero di tracce */
@@ -57,6 +58,7 @@ WINDOW *menu_win;       /* finestra con la lista delle tracce */
 WINDOW *info_win;       /* finestra con le info della traccia */
 WINDOW *play_win;       /* finestra con le playlist */
 WINDOW *opts_win;       /* finestra con le opzioni */
+WINDOW *time_win;       /* finestra con la durata della traccia */
 
 void print_menu (WINDOW *, int, char **, int, int, int); /* stampa un menu */
 void createPlaylist (void);     /* crea una playlist vuota */
@@ -81,13 +83,14 @@ int main (void)
     int highlight = 1;  /* cursore */
     int choice = 0;     /* traccia scelta */
     int isPaused;
+    int timeShown;
     int c;              /* carattere in input */
     int i;              /* contatori */
 
     FILE *fInfo;        /* file delle informazioni */
 
     randomnum = 1;
-    choice = shuffleMode = 0;
+    choice = shuffleMode = timeShown = 0;
     
 
     /* inzializzazione di ncurses */
@@ -128,6 +131,10 @@ int main (void)
     for (i = 0; i < n_options; i++)
         mvwprintw (opts_win, i + 1, 1, "%s", *(options + i));
     wrefresh (opts_win);
+
+    time_win = newwin (3, 30, starty + n_options + 2, startx + WIDTH + 1);
+    box (time_win, 0, 0);
+    wrefresh (time_win);
 
     /* creo il file con le tracce */
     strcpy (buffer, "touch ");
@@ -359,6 +366,8 @@ int main (void)
     }
     wrefresh (info_win);
 
+
+
     /* ristampa tutto per tenere aggiornato */
     print_menu (menu_win, highlight, choises, n_choices, HEIGHT, WIDTH);
 
@@ -367,14 +376,13 @@ int main (void)
         break;
 
     /* controllo fine traccia */
-    if (trackplaying)
+    if (trackplaying && c != '\n')
     {
         fInfo = fopen (trackinfofile, "r");
         fseek (fInfo, -6, SEEK_END);
         for (i = 0; i < 4; i++)
         buffer[i] = fgetc (fInfo);
         buffer[i] = '\0';
-        fclose (fInfo);
 
         /* fine traccia */
         if (!strcmp (buffer, "file"))
@@ -401,8 +409,90 @@ int main (void)
                 else
                     highlight = trackindex = choice = 1;
             }
+        } 
+
+        else 
+        {
+            fclose (fInfo);
+
+            strcpy (buffer, "echo '{ \"command\": [\"get_property_string\", \"time-pos\"]\
+            }\' | socat - /tmp/mpvsocket >& ");  
+            strcat (buffer, timingfile);
+            system (buffer);
+
+            if ((fInfo = fopen ("posizione.txt", "r")) != NULL)
+            {
+                for (i = 0; (c = fgetc (fInfo)) != EOF; i++)
+                    buffer[i] = c;
+                buffer[i] = '\0';
+
+                if (strstr (buffer, "socat") == NULL)
+                {
+
+
+                    strcpy (buffer, buffer + 9);
+                
+                    for (i = 0; buffer[i] != '\0' && buffer[i] != '.'; i++);
+                    buffer[i] = '\0';     
+
+                    wmove (time_win, 1, 5);
+                    wclrtoeol (menu_win);
+                    i = atoi (buffer);
+                    wattron (time_win, A_BOLD);
+                    wprintw (time_win, "%02d:%02d:%02d", i / 3600, i / 60, i % 60);
+                    wattroff (time_win, A_BOLD);
+                    box (time_win, 0, 0);
+                }
+
+                fclose (fInfo);
+                strcpy (buffer, "echo '{ \"command\": [\"get_property_string\", \"duration\"]\
+                }\' | socat - /tmp/mpvsocket >& ");  
+                strcat (buffer, timingfile);
+                system (buffer);
+                         
+                fInfo = fopen ("posizione.txt", "r");
+
+                for (i = 0; (c = fgetc (fInfo)) != EOF; i++)
+                    buffer[i] = c;
+                buffer[i] = '\0';
+
+
+                if (strstr (buffer, "socat") == NULL)
+                {
+                    for (i = 0; buffer[i + 9] != '\0'; i++)
+                        buffer[i] = buffer[i + 9];
+                    buffer[i] = '\0';
+
+                    for (i = 0; buffer[i] != '\0' && buffer[i] != '.'; i++);
+                    buffer[i] = '\0';     
+                        
+                    wmove (time_win, 1, 16);
+                    i = atoi (buffer);
+                    wattron (time_win, A_BOLD);
+                    wprintw (time_win, "%02d:%02d:%02d", i / 3600, i / 60, i % 60);
+                    wattroff (time_win, A_BOLD);
+                }
+            }
+            else
+            {
+                wmove (time_win, 1, 5),
+                wclrtoeol (time_win);
+                wprintw (time_win, "--:--:-- / --:--:--");
+                box (time_win, 0, 0);
+            } 
+            wrefresh (time_win);
         }
+        fclose (fInfo);
     }
+    else
+    {
+        wmove (time_win, 1, 5),
+        wclrtoeol (time_win);
+        wprintw (time_win, "--:--:-- / --:--:--");
+        box (time_win, 0, 0);
+    } 
+    wrefresh (time_win);
+
 
     /* traccia selezionata */
     if (c == '\n')
@@ -417,10 +507,12 @@ int main (void)
         fclose (fInfo);
 
         /* mpv --flags... tracks/"%s.mp4"> trackinfo.txt & */
+        //move (-4, 0);
+        refresh ();
         strcpy (buffer, trackplay);
         strcat (buffer, " --input-ipc-server=/tmp/mpvsocket tracks/\"");
         strcat (buffer, choises[choice - 1]);
-        strcat (buffer, "\" >& ");
+        strcat (buffer, "\" >& ");// > "); // &
         strcat (buffer, trackinfofile);
         strcat (buffer, " &");
         system (buffer);
@@ -435,37 +527,42 @@ int main (void)
         wprintw (info_win, " ");
 
 
-        for (i = 0; choises[choice - 1][i] != '\0' && i < (WIDTH - 10); i++)
-            wprintw (info_win, "%c", choises[choice - 1][i]);
+            for (i = 0; choises[choice - 1][i] != '\0' && i < (WIDTH - 10); i++)
+                wprintw (info_win, "%c", choises[choice - 1][i]);
 
-        if (strlen (choises[choice - 1]) > (WIDTH - 10))
-            wprintw (info_win, "...");
-        wrefresh (info_win);
+            if (strlen (choises[choice - 1]) > (WIDTH - 10))
+                wprintw (info_win, "...");
+
+            wrefresh (info_win);
+        }
+        wrefresh (menu_win);
     }
-    wrefresh (menu_win);
-  }
 
-  /* termino tutti i processi mpv */
-  system ("killall mpv");
+    /* termino tutti i processi mpv */
+    system ("killall mpv");
 
-  /* rimuovo i file temporanei */
-  strcpy (buffer, "rm ");
-  strcat (buffer, trackinfofile);
-  system (buffer);
+    /* rimuovo i file temporanei */
+    strcpy (buffer, "rm ");
+    strcat (buffer, trackinfofile);
+    system (buffer);
 
-  strcpy (buffer, "rm ");
-  strcat (buffer, tracklist);
-  system (buffer);
+    strcpy (buffer, "rm ");
+    strcat (buffer, tracklist);
+    system (buffer);
 
-  strcpy (buffer, "rm ");
-  strcat (buffer, playlistfile);
-  system (buffer);
+    strcpy (buffer, "rm ");
+    strcat (buffer, playlistfile);
+    system (buffer);
 
-  /* dealloco tutta la memoria per ncurses */
-  endwin();
+    strcpy (buffer, "rm ");
+    strcat (buffer, timingfile);
+    system (buffer);
+
+    /* dealloco tutta la memoria per ncurses */
+    endwin();
 
 
-  return 0;
+    return 0;
 }
 
 char **choisesinit (void)
@@ -485,7 +582,6 @@ char **choisesinit (void)
         exit (-1);
     }
 
-    /* TODO: 1. se non esitono file .mp4 2. includere altri formati */
     /* creazione del file contenenti i titoli */
     strcpy (buffer, "cd tracks/; ls *.mp* >&/dev/null; if [[ $? -ne 0 ]]; then\
             (cd .. && touch ERR.txt); else ls *.mp* > ../");
