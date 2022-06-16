@@ -61,13 +61,13 @@ WINDOW *opts_win;       /* finestra con le opzioni */
 WINDOW *time_win;       /* finestra con la durata della traccia */
 
 void print_menu (WINDOW *, int, char **, int, int, int); /* stampa un menu */
-void createPlaylist (void);     /* crea una playlist vuota */
-void displayplaylists (void);   /* mostra le playlist */
-void playlistsinmenu (int);     /* stampa le tracce della playlist */
-void addSongtoPlaylist (void);  /* aggiunge tracce a una playlist esistente */
+void createPlaylist (void);                 /* crea una playlist vuota */
+void displayplaylists (void);               /* mostra le playlist */
+void playlistsinmenu (int, WINDOW* );       /* stampa le tracce della playlist */
+void addSongtoPlaylist (void);              /* aggiunge tracce a una playlist esistente */
 
-char **choisesinit (void);      /* inizializzatore delle tracce */
-char **playlistinit (void);     /* inizializzatore delle playlist */
+char **choisesinit (void);                  /* inizializzatore delle tracce */
+char **playlistinit (void);                 /* inizializzatore delle playlist */
 char **matrixgenerator (char *, char **);   /* genera matrici da file */
 
 int system (char const *);
@@ -129,7 +129,7 @@ int main (void)
     opts_win = newwin (n_options + 2, 30, starty, startx + WIDTH + 1);
     box (opts_win, 0, 0);
     for (i = 0; i < n_options; i++)
-        mvwprintw (opts_win, i + 1, 1, "%s", *(options + i));
+        mvwprintw (opts_win, i + 1, 2, "%s", *(options + i));
     wrefresh (opts_win);
 
     time_win = newwin (3, 30, starty + n_options + 2, startx + WIDTH + 1);
@@ -188,7 +188,7 @@ int main (void)
             case ' ':
                 if (!trackplaying)
                 {
-                    trackindex = choice = highlight;
+                    choice = highlight;
                     isPaused = 0;
                     c = '\n';
                 }
@@ -223,9 +223,9 @@ int main (void)
             /* traccia casuale */
             case KEY_F(3):
                 if (rand > 0)
-                    highlight = choice = trackindex = rand;
+                    trackindex = highlight = choice = rand;
                 else
-                    highlight = choice = trackindex = 1;
+                    trackindex = highlight = choice = 1;
                 c = '\n';
                 break;
 
@@ -295,18 +295,18 @@ int main (void)
             /* traccia precedente */
             case KEY_F(11):
                 if (highlight == 1)
-                    highlight = choice = trackindex = n_choices;
-                else
-                    highlight = choice = trackindex = trackindex - 1;
+                    trackindex = highlight = choice = n_choices;
+                else if (trackindex > -1)
+                    trackindex = highlight = choice = trackindex - 1;
                 c = '\n';
                 break;
 
             /* traccia successiva */
             case KEY_F(12):
                 if (highlight == n_choices)
-                    highlight = choice = trackindex = 1;
-                else
-                    highlight = choice = trackindex += 1;
+                    trackindex = highlight = choice = 1;
+                else if (trackindex > - 1)
+                    trackindex = highlight = choice = trackindex + 1;
                 c = '\n';
                 break;
 
@@ -343,12 +343,12 @@ int main (void)
         if (trackplaying /* && trackindex != -1 */)
         {
             wattron (info_win, A_BLINK);
-            if (trackindex < 10)
+            if (highlight < 10)
             {
             wmove (info_win, 1, WIDTH - 6);
             wprintw (info_win, "%d/%d", trackindex, n_choices);
             }
-            else if (trackindex < 100)
+            else if (highlight < 100)
             {
             wmove (info_win, 1, WIDTH - 7);
             wprintw (info_win, "%d/%d", trackindex, n_choices);
@@ -395,17 +395,17 @@ int main (void)
                     if (choice < n_choices)
                     {
                         choice++;
-                        highlight = trackindex = choice;
+                        highlight = choice;
                     }
                     else 
-                        highlight = choice = trackindex = 1;
+                        highlight = choice =1;
                 }
                 else
                 {
                     if (rand > 0)
-                        highlight = trackindex = choice = rand;
+                        highlight = choice = rand;
                     else
-                        highlight = trackindex = choice = 1;
+                        highlight = choice = 1;
                 }
             } 
             else 
@@ -991,6 +991,7 @@ int scanplaylists (void)
         return 0;
     }
 
+    rewind (f);
     for (i = 0; (c = fgetc (f)) != EOF;)
         if (c == '\n')
             i++;
@@ -1032,18 +1033,50 @@ int scanplaylists (void)
 
 void displayplaylists ()
 {
+    int playlist_options_n = 6;
+    char *playlist_options[6] =
+    {
+        "<F1> Next playlist",
+        "<F2> Previous playlist",
+        "<F3> Random playlist",
+        "<F4> Delete playlist",
+        "<F5> New playlist",
+        "<TAB>/Arrows Quit",
+    };
+        
     int highlight;
     int c;
-    int j, k;
+    int i, j, k;
     int xMenu, yMenu;
     int additionalHeight;
 
     FILE *f;
 
+    WINDOW *local_info_win;
+
     additionalHeight = 5;
 
     play_win = newwin (HEIGHT + additionalHeight, startx - 2, starty, 1);
     wrefresh (play_win);
+
+    werase (opts_win);
+    for (i = 0; i < playlist_options_n; i++)
+        mvwprintw (opts_win, i + 1, 2, "%s", playlist_options[i]);
+    box (opts_win, 0, 0);
+    wrefresh (opts_win);
+
+    //printw ("%d", trackplaying);
+    //refresh ();
+    if (trackplaying)
+    {
+        local_info_win = newwin (4, WIDTH, starty - 5, startx);
+        box (local_info_win, 0, 0);
+        wrefresh (local_info_win);
+    }
+    else
+        local_info_win = info_win;
+
+
 
     wattron (play_win, A_BOLD);
     mvwprintw (play_win, 1, 1, "Playlists:");
@@ -1074,11 +1107,22 @@ void displayplaylists ()
                 break;
 
             case KEY_RIGHT:
-                playlistsinmenu (highlight);
+                playlistsinmenu (highlight, local_info_win);
                 break;
 
             case KEY_LEFT:
             case '\t':
+                werase (play_win);
+                wrefresh (play_win);
+
+                werase (local_info_win);
+                wrefresh (local_info_win);
+
+                werase (opts_win);
+                box (opts_win, 0, 0);
+                for (i = 0; i < n_options; i++)
+                    mvwprintw (opts_win, i + 1, 2, "%s", *(options + i));
+                wrefresh (opts_win);
                 return ;
                 break;
 
@@ -1135,9 +1179,9 @@ void displayplaylists ()
                     j++;
 
             for (k = 0; k < 7; k++)
-                mvwprintw (info_win, 1, 3 + k, " ");
-            mvwprintw (info_win, 1, 2, "0/%d", j);
-            wrefresh (info_win);
+                mvwprintw (local_info_win, 1, 3 + k, " ");
+            mvwprintw (local_info_win, 1, 2, "0/%d", j);
+            wrefresh (local_info_win);
 
             fclose (f);
         }
@@ -1147,7 +1191,7 @@ void displayplaylists ()
 }
 
 
-void playlistsinmenu (int track)
+void playlistsinmenu (int track, WINDOW *local_info_win)
 {
     char **songs;
 
@@ -1207,14 +1251,14 @@ void playlistsinmenu (int track)
                 fclose (f);
 
                 /* stampo la traccia avviata in info_win */
-                wmove (info_win, 2, 2);
-                wclrtoeol (info_win);
-                box (info_win, 0, 0);
-                wattron (info_win, A_BLINK);
-                wprintw (info_win, "- ");
-                wattroff (info_win, A_BLINK);
-                wprintw (info_win, "Playing: %s", *(songs + highlight - 1));
-                wrefresh (info_win);
+                wmove (local_info_win, 2, 2);
+                wclrtoeol (local_info_win);
+                box (local_info_win, 0, 0);
+                wattron (local_info_win, A_BLINK);
+                wprintw (local_info_win, "- ");
+                wattroff (local_info_win, A_BLINK);
+                wprintw (local_info_win, "Playing: %s", *(songs + highlight - 1));
+                wrefresh (local_info_win);
 
                 break;
 
@@ -1233,9 +1277,9 @@ void playlistsinmenu (int track)
     wrefresh (menu_win);
     
     for (c = 0; c < 7; c++)
-        mvwprintw (info_win, 1, 3 + c, " ");
-    mvwprintw (info_win, 1, 2, "%d/%d", highlight, n_tracks);
-    wrefresh (info_win);
+        mvwprintw (local_info_win, 1, 3 + c, " ");
+    mvwprintw (local_info_win, 1, 2, "%d/%d", highlight, n_tracks);
+    wrefresh (local_info_win);
 
     }
 
