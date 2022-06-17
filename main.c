@@ -345,13 +345,13 @@ int main (void)
             wattron (info_win, A_BLINK);
             if (highlight < 10)
             {
-            wmove (info_win, 1, WIDTH - 6);
-            wprintw (info_win, "%d/%d", trackindex, n_choices);
+                wmove (info_win, 1, WIDTH - 6);
+                wprintw (info_win, "%d/%d", trackindex, n_choices);
             }
             else if (highlight < 100)
             {
-            wmove (info_win, 1, WIDTH - 7);
-            wprintw (info_win, "%d/%d", trackindex, n_choices);
+                wmove (info_win, 1, WIDTH - 7);
+                wprintw (info_win, "%d/%d", trackindex, n_choices);
             }
             /* ... */
             wattroff (info_win, A_BLINK);
@@ -366,7 +366,7 @@ int main (void)
         }
         wrefresh (info_win);
 
-        /* ristampa tutto per tenere aggiornato */
+        /* ristampa tutto per tenere aggiornato */ 
         print_menu (menu_win, highlight, choises, n_choices, HEIGHT, WIDTH);
 
         /* esco dal programma */
@@ -395,17 +395,17 @@ int main (void)
                     if (choice < n_choices)
                     {
                         choice++;
-                        highlight = choice;
+                        highlight = trackindex = choice;
                     }
                     else 
-                        highlight = choice =1;
+                        highlight = choice = trackindex = 1;
                 }
                 else
                 {
                     if (rand > 0)
-                        highlight = choice = rand;
+                        highlight = choice = trackindex = rand;
                     else
-                        highlight = choice = 1;
+                        highlight = choice = trackindex = 1;
                 }
             } 
             else 
@@ -517,7 +517,6 @@ int main (void)
             wprintw (info_win, "-");
             wattroff (info_win, A_BLINK);
             wprintw (info_win, " ");
-
 
             for (i = 0; choises[choice - 1][i] != '\0' && i < (WIDTH - 10); i++)
                 wprintw (info_win, "%c", choises[choice - 1][i]);
