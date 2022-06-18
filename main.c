@@ -65,6 +65,7 @@ void createPlaylist (void);                 /* crea una playlist vuota */
 void displayplaylists (void);               /* mostra le playlist */
 void playlistsinmenu (int, WINDOW* );       /* stampa le tracce della playlist */
 void addSongtoPlaylist (void);              /* aggiunge tracce a una playlist esistente */
+int deleteplaylist (int);
 
 char **choisesinit (void);                  /* inizializzatore delle tracce */
 char **playlistinit (void);                 /* inizializzatore delle playlist */
@@ -245,6 +246,7 @@ int main (void)
 
             /* uccisione processi mpv */
             case KEY_F(5):
+            case 'q':
                 system ("killall mpv >& /dev/null");
                 trackplaying = 0;
                 break;
@@ -1049,11 +1051,16 @@ void displayplaylists ()
     int xMenu, yMenu;
     int additionalHeight;
 
+    int unsigned long randomnum;
+    int unsigned rand;
+
     FILE *f;
 
     WINDOW *local_info_win;
 
+    randomnum = 1;
     additionalHeight = 5;
+
 
     play_win = newwin (HEIGHT + additionalHeight, startx - 2, starty, 1);
     wrefresh (play_win);
@@ -1064,8 +1071,6 @@ void displayplaylists ()
     box (opts_win, 0, 0);
     wrefresh (opts_win);
 
-    //printw ("%d", trackplaying);
-    //refresh ();
     if (trackplaying)
     {
         local_info_win = newwin (4, WIDTH, starty - 5, startx);
@@ -1074,8 +1079,6 @@ void displayplaylists ()
     }
     else
         local_info_win = info_win;
-
-
 
     wattron (play_win, A_BOLD);
     mvwprintw (play_win, 1, 1, "Playlists:");
@@ -1089,9 +1092,13 @@ void displayplaylists ()
     {
         c = wgetch (play_win);
 
+        randomnum = randomnum * 1103515245 + 12345;
+        rand = (unsigned int) (randomnum / 65536) % (n_playlists + 1);
+
         switch (c)
         {
             case KEY_UP:
+            case KEY_F(1):
                 if (highlight == 1)
                     highlight = n_playlists;
                 else
@@ -1099,10 +1106,40 @@ void displayplaylists ()
                 break;
 
             case KEY_DOWN:
+            case KEY_F(2):
                 if (highlight == n_playlists)
                     highlight = 1;
                 else
                     ++highlight;
+                break;
+    
+            case KEY_F(3):
+                if (rand > 0)
+                    highlight = rand;
+                else
+                    highlight = 1;
+                break;
+
+            case KEY_F(4):
+                if (deleteplaylist (highlight))
+                {
+                    werase (play_win);
+                    wrefresh (play_win);
+                    move (starty - 1, startx);
+                    clrtoeol ();
+                    printw ("Non vi sono piu' playlist memorizzate");
+                    refresh ();
+                    
+                    werase (opts_win);
+                    box (opts_win, 0, 0);
+                    for (i = 0; i < n_options; i++)
+                        mvwprintw (opts_win, i + 1, 2, "%s", *(options + i));
+                    wrefresh (opts_win);
+
+                    return;
+                }
+                else
+                    highlight = 1;
                 break;
 
             case KEY_RIGHT:
@@ -1657,4 +1694,48 @@ void addSongtoPlaylist (void)
     
 
     return ;
+}
+
+int deleteplaylist (int highlight)
+{
+    char *name;
+
+    int i;
+
+    i = highlight - 1;
+
+    name = malloc (sizeof (char) * (int) strlen (*(playlists + i)));
+    strcpy (name, *(playlists + i));
+
+    for (i++ ; *(playlists + i) != NULL; i++)
+    {
+        *(playlists + i - 1) = malloc (sizeof (char) * (int) strlen (*(playlists + i)));
+        strcpy (*(playlists + i - 1), *(playlists + i));
+    }
+    *(playlists + i - 1) = NULL;
+
+    strcpy (buffer, "rm ");
+    strcat (buffer, name);
+    strcat (buffer, " ");
+    strcat (buffer, playlistfile);
+    system (buffer);
+
+    strcpy (buffer, "touch ");
+    strcat (buffer, playlistfile);
+    system (buffer);
+
+    if (scanplaylists ())
+        playlists = playlistinit ();
+    else
+        return 1;
+
+    werase (play_win);
+    wattron (play_win, A_BOLD);
+    mvwprintw (play_win, 1, 1, "Playlists:");
+    wattroff (play_win, A_BOLD);
+    box (play_win, 0, 0);
+    wrefresh (play_win);
+    wrefresh (play_win);
+
+    return 0;
 }
