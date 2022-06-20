@@ -65,7 +65,7 @@ void createPlaylist (void);                 /* crea una playlist vuota */
 void displayplaylists (void);               /* mostra le playlist */
 void playlistsinmenu (int, WINDOW* );       /* stampa le tracce della playlist */
 void addSongtoPlaylist (void);              /* aggiunge tracce a una playlist esistente */
-int deleteplaylist (int);
+void updateplaytime (WINDOW *);
 
 char **choisesinit (void);                  /* inizializzatore delle tracce */
 char **playlistinit (void);                 /* inizializzatore delle playlist */
@@ -73,6 +73,7 @@ char **matrixgenerator (char *, char **);   /* genera matrici da file */
 
 int system (char const *);
 int scanplaylists (void);        /* controlla per nuove playlist */
+int deleteplaylist (int);
 
 int main (void)
 {
@@ -120,7 +121,6 @@ int main (void)
     nodelay (stdscr, TRUE);
     nodelay (menu_win, TRUE);
     nodelay (play_win, TRUE);
-
 
     mvprintw (0, 0, "Mp3blatty");// by Devilisse");
     mvprintw (stdscry - 1, stdscrx - 7, "v. 1.0");
@@ -340,7 +340,6 @@ int main (void)
         else if (isPaused == 1)
             wprintw (info_win, "Paused");
 
-
         /* se una traccia e' riprodotta stampo il suo indice */
         if (trackplaying /* && trackindex != -1 */)
         {
@@ -383,6 +382,7 @@ int main (void)
             for (i = 0; i < 4; i++)
                 buffer[i] = fgetc (fInfo);
             buffer[i] = '\0';   
+            fclose (fInfo);
 
             /* fine traccia */
             if (!strcmp (buffer, "file"))
@@ -411,74 +411,7 @@ int main (void)
                 }
             } 
             else 
-            {
-                fclose (fInfo);
-
-                strcpy (buffer, "echo '{ \"command\": [\"get_property_string\", \"time-pos\"]\
-                }\' | socat - /tmp/mpvsocket >& ");  
-                strcat (buffer, timingfile);
-                system (buffer);
-
-                if ((fInfo = fopen ("posizione.txt", "r")) != NULL)
-                {
-                    for (i = 0; (c = fgetc (fInfo)) != EOF; i++)
-                        buffer[i] = c;
-                    buffer[i] = '\0';
-
-                    if (strstr (buffer, "socat") == NULL)
-                    {
-                        strcpy (buffer, buffer + 9);
-                
-                        for (i = 0; buffer[i] != '\0' && buffer[i] != '.'; i++);
-                        buffer[i] = '\0';     
-
-                        wmove (time_win, 1, 5);
-                        wclrtoeol (menu_win);
-                        i = atoi (buffer);
-                        wattron (time_win, A_BOLD);
-                        wprintw (time_win, "%02d:%02d:%02d", i / 3600, i / 60, i % 60);
-                        wattroff (time_win, A_BOLD);
-                        box (time_win, 0, 0);
-                    }
-
-                    fclose (fInfo);
-                    strcpy (buffer, "echo '{ \"command\": [\"get_property_string\", \"duration\"]\
-                    }\' | socat - /tmp/mpvsocket >& ");  
-                    strcat (buffer, timingfile);
-                    system (buffer);
-                         
-                    fInfo = fopen ("posizione.txt", "r");
-
-                    for (i = 0; (c = fgetc (fInfo)) != EOF; i++)
-                        buffer[i] = c;
-                    buffer[i] = '\0';
-
-                    if (strstr (buffer, "socat") == NULL)
-                    {
-                        for (i = 0; buffer[i + 9] != '\0'; i++)
-                            buffer[i] = buffer[i + 9];
-                        buffer[i] = '\0';
-
-                        for (i = 0; buffer[i] != '\0' && buffer[i] != '.'; i++);
-                        buffer[i] = '\0';     
-                        
-                        wmove (time_win, 1, 16);
-                        i = atoi (buffer);
-                        wattron (time_win, A_BOLD);
-                        wprintw (time_win, "%02d:%02d:%02d", i / 3600, i / 60, i % 60);
-                        wattroff (time_win, A_BOLD);
-                    }
-                }
-                else
-                {
-                    wmove (time_win, 1, 5),
-                    wclrtoeol (time_win);
-                    wprintw (time_win, "--:--:-- / --:--:--");
-                    box (time_win, 0, 0);
-                } 
-                wrefresh (time_win);
-            }
-            fclose (fInfo);
+                updateplaytime (time_win);
         }
         else
         {
@@ -486,8 +419,8 @@ int main (void)
             wclrtoeol (time_win);
             wprintw (time_win, "--:--:-- / --:--:--");
             box (time_win, 0, 0);
+            wrefresh (time_win);
         } 
-        wrefresh (time_win);
 
         /* traccia selezionata */
         if (c == '\n')
@@ -556,6 +489,88 @@ int main (void)
 
 
     return 0;
+}
+
+void updateplaytime (WINDOW *time_win)
+{
+    char *localBuffer;
+
+    int i, c;
+
+    FILE *fInfo;
+
+    localBuffer = malloc (sizeof (char) * L);
+
+    /* posizione nella canzone */
+    strcpy (localBuffer, "echo '{ \"command\": [\"get_property_string\", \"time-pos\"]\
+    }\' | socat - /tmp/mpvsocket >& ");  
+    strcat (localBuffer, timingfile);
+    system (localBuffer);
+
+    if ((fInfo = fopen (timingfile, "r")) != NULL)
+    {
+        for (i = 0; (c = fgetc (fInfo)) != EOF; i++)
+            localBuffer[i] = c;
+        localBuffer[i] = '\0';
+
+        if (strstr (localBuffer, "socat") == NULL)
+        {
+            strcpy (localBuffer, localBuffer + 9);
+                
+            for (i = 0; localBuffer[i] != '\0' && localBuffer[i] != '.'; i++);
+            localBuffer[i] = '\0';     
+
+            wmove (time_win, 1, 5);
+            wclrtoeol (menu_win);
+            i = atoi (localBuffer);
+            wattron (time_win, A_BOLD);
+            wprintw (time_win, "%02d:%02d:%02d", i / 3600, i / 60, i % 60);
+            wattroff (time_win, A_BOLD);
+            box (time_win, 0, 0);
+        }
+        fclose (fInfo);
+
+        /* durata della canzone */
+        strcpy (localBuffer, "echo '{ \"command\": [\"get_property_string\", \"duration\"]\
+        }\' | socat - /tmp/mpvsocket >& ");  
+        strcat (localBuffer, timingfile);
+        system (localBuffer);
+                         
+        fInfo = fopen (timingfile, "r");
+
+        for (i = 0; (c = fgetc (fInfo)) != EOF; i++)
+            localBuffer[i] = c;
+        localBuffer[i] = '\0';
+
+        if (strstr (localBuffer, "socat") == NULL)
+        {
+            for (i = 0; localBuffer[i + 9] != '\0'; i++)
+                localBuffer[i] = localBuffer[i + 9];
+            localBuffer[i] = '\0';
+
+            for (i = 0; localBuffer[i] != '\0' && localBuffer[i] != '.'; i++);
+            localBuffer[i] = '\0';     
+                        
+            wmove (time_win, 1, 16);
+            i = atoi (localBuffer);
+            wattron (time_win, A_BOLD);
+            wprintw (time_win, "%02d:%02d:%02d", i / 3600, i / 60, i % 60);
+            wattroff (time_win, A_BOLD);
+        }
+    }
+    else    /* nessuna canzone e'riprodotta al momento */
+    {
+        wmove (time_win, 1, 5),
+        wclrtoeol (time_win);
+        wprintw (time_win, "--:--:-- / --:--:--");
+        box (time_win, 0, 0);
+    } 
+
+    wrefresh (time_win);
+    fclose (fInfo);
+    free (localBuffer);
+
+    return ;
 }
 
 char **choisesinit (void)
@@ -706,8 +721,7 @@ char **matrixgenerator (char *s, char **m)
 
     FILE *f;
 
-
-       
+ 
     /* riapro il file delle tracce in lettura */
     f = fopen (s, "r");
 
@@ -759,16 +773,11 @@ void print_menu (WINDOW *win, int highlight, char **m, int len, int height, int 
 
     x = y = 2;
     i = highlight - 1;
-
     range = width - 2 - 4 - 1;
     
+
     move (stdscry - 1, 0);
     clrtoeol ();
-    //printw ("%d/%d", width, range);
-
-    /* menu'statico / ultime HEIGHT scelte */
-    //if (len <= (i + HEIGHT - 4)) //|| len < HEIGHT)
-    //if (HEIGHT < (len - i))
 
     if (highlight > (len - height + 4) || len <= height - 4)
     {
@@ -874,10 +883,10 @@ void print_menu (WINDOW *win, int highlight, char **m, int len, int height, int 
             }
         }
     }
-
-
     box (win, 0, 0);
     wrefresh (win);
+
+
     return ;
 }
 
@@ -885,9 +894,12 @@ void createPlaylist (void)
 {
     char *line = "Inserire il nome della playlist: ";
 
+    int lineLen;
     int i, c;
 
     FILE *f;
+
+    lineLen = strlen (line);
 
 
     echo ();
@@ -902,7 +914,6 @@ void createPlaylist (void)
 
     move (starty - 1, startx);
     clrtoeol ();
-
 
     /* stampa del prompt di inserimento */
     printw (line);
@@ -932,6 +943,11 @@ void createPlaylist (void)
         /* BACKSPACE quando non ci sono caratteri... */
         if (i < -1)
             i = -1;
+
+        curs_set (0);
+        updateplaytime (time_win);
+        move (starty - 1, startx + i + lineLen + 1);
+        curs_set (1);
     }
 
     noecho ();
@@ -975,7 +991,6 @@ int scanplaylists (void)
     strcpy (buffer, "ls *.ply >& ");
     strcat (buffer, playlistfile);
     system (buffer);
-
 
     /* caso in cui non esistano le playlist */
     f = fopen (playlistfile, "r");
@@ -1034,7 +1049,6 @@ int scanplaylists (void)
 
 void displayplaylists ()
 {
-    int playlist_options_n = 6;
     char *playlist_options[6] =
     {
         "<F1> Next playlist",
@@ -1044,7 +1058,8 @@ void displayplaylists ()
         "<F5> New playlist",
         "<TAB>/Arrows Quit",
     };
-        
+
+    int playlist_options_n = 6;
     int highlight;
     int c;
     int i, j, k;
@@ -1070,14 +1085,14 @@ void displayplaylists ()
         mvwprintw (opts_win, i + 1, 2, "%s", playlist_options[i]);
     box (opts_win, 0, 0);
     wrefresh (opts_win);
-
+/*
     if (trackplaying)
     {
         local_info_win = newwin (4, WIDTH, starty - 5, startx);
         box (local_info_win, 0, 0);
         wrefresh (local_info_win);
     }
-    else
+    else*/
         local_info_win = info_win;
 
     wattron (play_win, A_BOLD);
@@ -1142,6 +1157,9 @@ void displayplaylists ()
                     highlight = 1;
                 break;
 
+            case KEY_F(5):
+                break;
+
             case KEY_RIGHT:
                 playlistsinmenu (highlight, local_info_win);
                 break;
@@ -1163,7 +1181,8 @@ void displayplaylists ()
                 break;
 
             default:
-               break;
+                updateplaytime (time_win);
+                break;
         }
         
         print_menu (play_win, highlight, playlists, n_playlists, HEIGHT + additionalHeight, startx - 2);
@@ -1286,6 +1305,11 @@ void playlistsinmenu (int track, WINDOW *local_info_win)
                 system (buffer);
                 fclose (f);
 
+                werase (local_info_win);
+                local_info_win = NULL;
+                local_info_win = newwin (6, WIDTH, starty + HEIGHT, startx);
+                box (local_info_win, 0, 0);
+
                 /* stampo la traccia avviata in info_win */
                 wmove (local_info_win, 2, 2);
                 wclrtoeol (local_info_win);
@@ -1295,6 +1319,8 @@ void playlistsinmenu (int track, WINDOW *local_info_win)
                 wattroff (local_info_win, A_BLINK);
                 wprintw (local_info_win, "Playing: %s", *(songs + highlight - 1));
                 wrefresh (local_info_win);
+
+                trackplaying = 1;
 
                 break;
 
@@ -1306,7 +1332,8 @@ void playlistsinmenu (int track, WINDOW *local_info_win)
                 break;
 
             default:
-               break;
+                updateplaytime (time_win);
+                break;
     }
 
     print_menu (menu_win, highlight, songs, n_tracks, HEIGHT, WIDTH);
@@ -1318,8 +1345,6 @@ void playlistsinmenu (int track, WINDOW *local_info_win)
     wrefresh (local_info_win);
 
     }
-
-
 }
 
 void addSongtoPlaylist (void)
@@ -1342,9 +1367,9 @@ void addSongtoPlaylist (void)
     FILE *f;
     FILE *fIn;
 
-
     x = 2;
     y = 1;
+
 
     /* lista le playlist nella cartella */
     strcpy (buffer, "ls *.ply >& ");
@@ -1374,10 +1399,9 @@ void addSongtoPlaylist (void)
             fLines++;
     
     m = malloc (sizeof (char *) * (fLines + 1));
-    //*(m  + fLines + 1) = NULL;
     rewind (f);
 
-    for (j = i = 0; 1 /*j < fLines */; i++)
+    for (j = i = 0; 1; i++)
     {
         c = fgetc (f);
 
@@ -1402,7 +1426,6 @@ void addSongtoPlaylist (void)
     }
     *(m + j) = '\0';
     fclose (f);
-
 
     werase (menu_win);
     wmove (menu_win, y, x),
@@ -1441,8 +1464,8 @@ void addSongtoPlaylist (void)
                 playlistnum = highlight;
                 break;
 
-
             default:
+                updateplaytime (time_win);
                 break;
         }
 
@@ -1453,7 +1476,7 @@ void addSongtoPlaylist (void)
     wmove (menu_win, 1, 2);
     wclrtoeol (menu_win);
     wattron (menu_win, A_BOLD);
-    wprintw (menu_win, "Selezionare le tracce\t    <F1> abortire <TAB> per uscire");
+    wprintw (menu_win, "Selezionare le tracce\t    <F1> abortire <TAB> accettare");
     wattroff (menu_win, A_BOLD);
     wrefresh (menu_win);
 
@@ -1465,7 +1488,6 @@ void addSongtoPlaylist (void)
     {
         switch (c = wgetch (menu_win))
         {
-
             case KEY_UP:
                 if (highlight == 1)
                     highlight = n_choices;
@@ -1498,6 +1520,7 @@ void addSongtoPlaylist (void)
                 break;
 
             default:
+                updateplaytime (time_win);
                 break;
         }
     
@@ -1704,6 +1727,7 @@ int deleteplaylist (int highlight)
 
     i = highlight - 1;
 
+
     name = malloc (sizeof (char) * (int) strlen (*(playlists + i)));
     strcpy (name, *(playlists + i));
 
@@ -1719,6 +1743,8 @@ int deleteplaylist (int highlight)
     strcat (buffer, " ");
     strcat (buffer, playlistfile);
     system (buffer);
+
+    free (name);
 
     strcpy (buffer, "touch ");
     strcat (buffer, playlistfile);
