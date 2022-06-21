@@ -1,9 +1,14 @@
+/* TODO:
+ *      in some modes if the song ends it doens't choose the next one.
+ *      update other fields of _t
+ *      infos on volume (and a way to edit value and/or sink)
+ *      more options for playlist mode
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
 #include <ncurses.h>
-#include <time.h>
 
 #define L 500
 #define WIDTH 60
@@ -79,6 +84,7 @@ int deleteplaylist (int);
 struct _t
 {
     char *trackName;        /* nome della traccia */
+    char *originSection;    /* all songs, playlists... */
     
     int time_position;      /* timestamp attuale */
     int time_duration;      /* durata della canzone */
