@@ -66,6 +66,7 @@ void displayplaylists (void);               /* mostra le playlist */
 void playlistsinmenu (int, WINDOW* );       /* stampa le tracce della playlist */
 void addSongtoPlaylist (void);              /* aggiunge tracce a una playlist esistente */
 void updateplaytime (WINDOW *);
+void info_win_global_update (int, int);
 
 char **choisesinit (void);                  /* inizializzatore delle tracce */
 char **playlistinit (void);                 /* inizializzatore delle playlist */
@@ -74,6 +75,20 @@ char **matrixgenerator (char *, char **);   /* genera matrici da file */
 int system (char const *);
 int scanplaylists (void);        /* controlla per nuove playlist */
 int deleteplaylist (int);
+
+struct _t
+{
+    char *trackName;        /* nome della traccia */
+    
+    int time_position;      /* timestamp attuale */
+    int time_duration;      /* durata della canzone */
+    int isPaused;           /* 1 si 0 no */
+
+    int group_index;        /* indice della canzone */
+    int group_total;        /* totale di canzoni nel gruppo */
+};
+
+struct _t track; 
 
 int main (void)
 {
@@ -88,12 +103,12 @@ int main (void)
     int timeShown;
     int c;              /* carattere in input */
     int i;              /* contatori */
-
+    
     FILE *fInfo;        /* file delle informazioni */
+
 
     randomnum = 1;
     choice = shuffleMode = timeShown = 0;
-    
 
     /* inzializzazione di ncurses */
     initscr();
@@ -148,7 +163,7 @@ int main (void)
     system (buffer);
     playlists = playlistinit ();
 
-    for (isPaused = -1; ; )
+    for (track.trackName = NULL, isPaused = -1; ; )
     {
         wattron (menu_win, A_BOLD);
         wmove (menu_win, 1, 1);
@@ -166,7 +181,7 @@ int main (void)
         {
             move (starty - 1, startx);
             clrtoeol ();
-           refresh ();
+            refresh ();
         }
 
         switch (c)
@@ -191,6 +206,7 @@ int main (void)
                 {
                     choice = highlight;
                     isPaused = 0;
+                    track.isPaused = 0;
                     c = '\n';
                 }
                 else if (isPaused)
@@ -198,12 +214,14 @@ int main (void)
                     system ("echo \'{ \"command\": [\"set_property\", \"pause\", false] }' | socat \
                     - /tmp/mpvsocket >& /dev/null");
                     isPaused = 0;
+                    track.isPaused = 0;
                 }
                 else
                 {
                     system ("echo \'{ \"command\": [\"set_property\", \"pause\", true] }' | socat \
                     - /tmp/mpvsocket >& /dev/null");
                     isPaused = 1;
+                    track.isPaused = 1;
                 }
                 break;
 
@@ -212,6 +230,7 @@ int main (void)
                 system ("echo \'{ \"command\": [\"set_property\", \"pause\", false] }' | socat \
                 - /tmp/mpvsocket >& /dev/null");
                 isPaused = 0;
+                track.isPaused = 0;
                 break;
 
             /* pause */
@@ -219,6 +238,7 @@ int main (void)
                 system ("echo \'{ \"command\": [\"set_property\", \"pause\", true] }' | socat \
                 - /tmp/mpvsocket >& /dev/null");
                 isPaused = 1;
+                track.isPaused = 1;
                 break;
 
             /* traccia casuale */
@@ -321,51 +341,13 @@ int main (void)
             case '\n':
                 trackindex = choice = highlight;
                 isPaused = 0;
+                track.isPaused = 0;
                 break;
 
             default:
                 wrefresh (menu_win);
                 break;
         }
-
-        /* stampa della traccia highlight in info_win */
-        wmove (info_win, 1, 2);
-        wclrtoeol (info_win);
-        box (info_win, 0, 0);
-        wprintw (info_win, "%d/%d", highlight, n_choices);
-        wmove (info_win, 1, (WIDTH - 9) / 2);
-
-        if (!isPaused)
-            wprintw (info_win, "Playing");
-        else if (isPaused == 1)
-            wprintw (info_win, "Paused");
-
-        /* se una traccia e' riprodotta stampo il suo indice */
-        if (trackplaying /* && trackindex != -1 */)
-        {
-            wattron (info_win, A_BLINK);
-            if (highlight < 10)
-            {
-                wmove (info_win, 1, WIDTH - 6);
-                wprintw (info_win, "%d/%d", trackindex, n_choices);
-            }
-            else if (highlight < 100)
-            {
-                wmove (info_win, 1, WIDTH - 7);
-                wprintw (info_win, "%d/%d", trackindex, n_choices);
-            }
-            /* ... */
-            wattroff (info_win, A_BLINK);
-        }
-        else
-        {
-            wmove (info_win, 1, (WIDTH - 9) / 2);
-            wclrtoeol (info_win);
-            wmove (info_win, 2, 2);
-            wclrtoeol (info_win);
-            box (info_win, 0, 0);
-        }
-        wrefresh (info_win);
 
         /* ristampa tutto per tenere aggiornato */ 
         print_menu (menu_win, highlight, choises, n_choices, HEIGHT, WIDTH);
@@ -444,23 +426,17 @@ int main (void)
             strcat (buffer, " &");
             system (buffer);
 
-            /* stampo la traccia avviata in info_win */
-            wmove (info_win, 2, 2);
-            wclrtoeol (info_win);
-            box (info_win, 0, 0);
-            wattron (info_win, A_BLINK);
-            wprintw (info_win, "-");
-            wattroff (info_win, A_BLINK);
-            wprintw (info_win, " ");
+            if (track.trackName != NULL)
+                free (track.trackName);
 
-            for (i = 0; choises[choice - 1][i] != '\0' && i < (WIDTH - 10); i++)
-                wprintw (info_win, "%c", choises[choice - 1][i]);
+            track.trackName = malloc (sizeof (char) * (strlen (choises[choice - 1]) + 1));
+            strcpy (track.trackName, choises[choice - 1]);
 
-            if (strlen (choises[choice - 1]) > (WIDTH - 10))
-                wprintw (info_win, "...");
-
-            wrefresh (info_win);
+            track.group_index = trackindex;
+            track.group_total = n_choices;
         }
+
+        info_win_global_update (highlight, n_choices);
         wrefresh (menu_win);
     }
 
@@ -516,7 +492,7 @@ void updateplaytime (WINDOW *time_win)
         if (strstr (localBuffer, "socat") == NULL)
         {
             strcpy (localBuffer, localBuffer + 9);
-                
+ 
             for (i = 0; localBuffer[i] != '\0' && localBuffer[i] != '.'; i++);
             localBuffer[i] = '\0';     
 
@@ -605,7 +581,7 @@ char **choisesinit (void)
         box (menu_win, 0, 0);
         wrefresh (menu_win);
         refresh ();
-        
+ 
         while ((c = wgetch (menu_win)) == ERR);
         strcpy (buffer, "rm ERR.txt ");
         strcat (buffer, tracklist);
@@ -906,17 +882,11 @@ void createPlaylist (void)
     nodelay (stdscr, FALSE);
     curs_set(1);
 
-    getmaxyx (stdscr, stdscry, stdscrx);
-
-    /* creazione di menu_win */
-    startx = (stdscrx - WIDTH) / 2;
-    starty = (stdscry - HEIGHT) / 2;
-
     move (starty - 1, startx);
     clrtoeol ();
+    printw (line);
 
     /* stampa del prompt di inserimento */
-    printw (line);
     for (i = 0, *buffer = '\0'; (c = wgetch (stdscr)) != '\n'; i++)
     {
         switch (c)
@@ -1085,15 +1055,17 @@ void displayplaylists ()
         mvwprintw (opts_win, i + 1, 2, "%s", playlist_options[i]);
     box (opts_win, 0, 0);
     wrefresh (opts_win);
-/*
+    
+/*  Se voglio reimplementare la barra separata per le playlist
     if (trackplaying)
     {
         local_info_win = newwin (4, WIDTH, starty - 5, startx);
         box (local_info_win, 0, 0);
         wrefresh (local_info_win);
     }
-    else*/
-        local_info_win = info_win;
+    else
+*/
+    local_info_win = info_win;
 
     wattron (play_win, A_BOLD);
     mvwprintw (play_win, 1, 1, "Playlists:");
@@ -1158,9 +1130,14 @@ void displayplaylists ()
                 break;
 
             case KEY_F(5):
+                createPlaylist ();
+                scanplaylists ();
+                playlists = playlistinit ();
+                highlight = 1;
                 break;
 
             case KEY_RIGHT:
+            case '\n':
                 playlistsinmenu (highlight, local_info_win);
                 break;
 
@@ -1233,10 +1210,13 @@ void displayplaylists ()
                 if (c == '\n')
                     j++;
 
+            /*
             for (k = 0; k < 7; k++)
                 mvwprintw (local_info_win, 1, 3 + k, " ");
             mvwprintw (local_info_win, 1, 2, "0/%d", j);
             wrefresh (local_info_win);
+            */
+            info_win_global_update (0, j);
 
             fclose (f);
         }
@@ -1246,7 +1226,7 @@ void displayplaylists ()
 }
 
 
-void playlistsinmenu (int track, WINDOW *local_info_win)
+void playlistsinmenu (int n, WINDOW *local_info_win)
 {
     char **songs;
 
@@ -1259,7 +1239,7 @@ void playlistsinmenu (int track, WINDOW *local_info_win)
     songs = NULL;
 
 
-    songs = matrixgenerator (playlists[track - 1], songs);
+    songs = matrixgenerator (playlists[n - 1], songs);
     
     for (n_tracks = 0; *(songs + n_tracks) != NULL; n_tracks++);
 
@@ -1305,12 +1285,22 @@ void playlistsinmenu (int track, WINDOW *local_info_win)
                 system (buffer);
                 fclose (f);
 
+                if (track.trackName != NULL)
+                    free (track.trackName);
+
+                track.trackName = malloc (sizeof (char) * (strlen (songs[highlight - 1]) + 1));
+                strcpy (track.trackName, songs[highlight - 1]);
+                
+                track.group_index = highlight;
+                track.group_total = n_tracks;
+
+                /*
                 werase (local_info_win);
                 local_info_win = NULL;
                 local_info_win = newwin (6, WIDTH, starty + HEIGHT, startx);
                 box (local_info_win, 0, 0);
 
-                /* stampo la traccia avviata in info_win */
+                 stampo la traccia avviata in info_win 
                 wmove (local_info_win, 2, 2);
                 wclrtoeol (local_info_win);
                 box (local_info_win, 0, 0);
@@ -1318,31 +1308,39 @@ void playlistsinmenu (int track, WINDOW *local_info_win)
                 wprintw (local_info_win, "- ");
                 wattroff (local_info_win, A_BLINK);
                 wprintw (local_info_win, "Playing: %s", *(songs + highlight - 1));
-                wrefresh (local_info_win);
+                wrefresh (local_info_win); */
 
                 trackplaying = 1;
+                //trackindex = highlight;
 
                 break;
 
             case KEY_RIGHT:
             case KEY_LEFT:
             case '\t':
+                werase (local_info_win);
+                wrefresh (local_info_win);
+                box (info_win, 0, 0);
+                wrefresh (info_win);
                 free (songs);
                 return ;
                 break;
 
             default:
                 updateplaytime (time_win);
+                info_win_global_update (highlight, n_tracks);
                 break;
-    }
+        }
 
-    print_menu (menu_win, highlight, songs, n_tracks, HEIGHT, WIDTH);
-    wrefresh (menu_win);
-    
-    for (c = 0; c < 7; c++)
-        mvwprintw (local_info_win, 1, 3 + c, " ");
-    mvwprintw (local_info_win, 1, 2, "%d/%d", highlight, n_tracks);
-    wrefresh (local_info_win);
+        print_menu (menu_win, highlight, songs, n_tracks, HEIGHT, WIDTH);
+        wrefresh (menu_win);
+
+        /*
+        for (c = 0; c < 7; c++)
+            mvwprintw (local_info_win, 1, 3 + c, " ");
+        mvwprintw (local_info_win, 1, 2, "%d/%d", highlight, n_tracks);
+        wrefresh (local_info_win); */
+
 
     }
 }
@@ -1765,3 +1763,59 @@ int deleteplaylist (int highlight)
 
     return 0;
 }
+
+void info_win_global_update (int current, int total)
+{
+    int i;
+
+
+    werase (info_win);
+
+    wmove (info_win, 1, 2);
+    wprintw (info_win, "%d/%d", current, total);
+
+    if (!trackplaying)
+    {
+        box (info_win, 0, 0);
+        wrefresh (info_win);
+        return;
+    }
+
+    wmove (info_win, 2, 2);
+    wattron (info_win, A_BLINK);
+    wprintw (info_win, "-");
+    wattroff (info_win, A_BLINK);
+    wprintw (info_win, " ");
+
+    for (i = 0; *(track.trackName + i) != '\0' && i < (WIDTH - 10); i++)
+        wprintw (info_win, "%c", *(track.trackName + i));
+
+    if (strlen (track.trackName) > (WIDTH - 10))
+        wprintw (info_win, "...");
+
+    wmove (info_win, 1, (WIDTH - 9) / 2);
+    if (!track.isPaused)
+        wprintw (info_win, "Playing");
+    else
+        wprintw (info_win, "Paused");
+
+    wattron (info_win, A_BLINK);
+    if (track.group_index < 10)
+    {
+        wmove (info_win, 1, WIDTH - 6);
+        wprintw (info_win, "%d/%d", track.group_index, track.group_total);
+    }
+    else if (track.group_index < 100)
+    {    
+        wmove (info_win, 1, WIDTH - 7);
+        wprintw (info_win, "%d/%d", track.group_index, track.group_total);
+    }
+    wattroff (info_win, A_BLINK);
+
+
+    box (info_win, 0, 0);
+    wrefresh (info_win);
+
+    return ;
+}
+
