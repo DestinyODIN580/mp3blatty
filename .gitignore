@@ -8,6 +8,4 @@ mp3blatty
 *.ply
 
 # file temporanei
-playlistnames.txt
-tracks.txt
-trackinfo.txt
+*.txt
