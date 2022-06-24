@@ -1,13 +1,17 @@
 /* TODO:
  *      in some modes if the song ends it doens't choose the next one.
  *      update other fields of _t
- *      infos on volume (and a way to edit value and/or sink)
+ *      infos on volume (and a way to edit value and/or sink) --
  *      more options for playlist mode
+ *      put all *.ply files in a playlists folder (edit BUILD file alongside with these changes)
+ *      colors ?
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+// #include <unistd.h>
+// #include <signal.h>
 #include <ncurses.h>
 
 #define L 500
@@ -18,6 +22,7 @@ char *tracklist = "tracks.txt";          /* file con la lista delle tracce */
 char *trackinfofile = "trackinfo.txt";   /* file con le info della traccia */
 char *playlistfile = "playlistnames.txt";/* file con la lista delle playlist */
 char *timingfile = "posizione.txt";      /* file con il tempo della traccia */
+char *metadata = "data.txt";
 char *trackplay = "mpv ";                /* lettore */
 
 char buffer[L]; /* buffer generico */
@@ -70,17 +75,20 @@ void createPlaylist (void);                 /* crea una playlist vuota */
 void displayplaylists (void);               /* mostra le playlist */
 void playlistsinmenu (int, WINDOW* );       /* stampa le tracce della playlist */
 void addSongtoPlaylist (void);              /* aggiunge tracce a una playlist esistente */
-void updateplaytime (WINDOW *);
-void info_win_global_update (int, int);
+void updateplaytime (WINDOW *);             /* aggiorna il timestamp della canzone in time_win*/
+void info_win_global_update (int, int);     /* aggiorna la info_win tramite le info di _t */
+void updateVol (void);
 
 char **choisesinit (void);                  /* inizializzatore delle tracce */
 char **playlistinit (void);                 /* inizializzatore delle playlist */
 char **matrixgenerator (char *, char **);   /* genera matrici da file */
 
 int system (char const *);
-int scanplaylists (void);        /* controlla per nuove playlist */
-int deleteplaylist (int);
+int scanplaylists (void);           /* controlla per nuove playlist */
+int deleteplaylist (int);           /* cancella una playlist */
+int globalvolume;
 
+/* descrittore traccia */
 struct _t
 {
     char *trackName;        /* nome della traccia */
@@ -93,7 +101,6 @@ struct _t
     int group_index;        /* indice della canzone */
     int group_total;        /* totale di canzoni nel gruppo */
 };
-
 struct _t track; 
 
 int main (void)
@@ -112,7 +119,6 @@ int main (void)
     
     FILE *fInfo;        /* file delle informazioni */
 
-
     randomnum = 1;
     choice = shuffleMode = timeShown = 0;
 
@@ -122,6 +128,7 @@ int main (void)
     noecho();
     curs_set(0);
     cbreak();
+    start_color ();
 
     getmaxyx (stdscr, stdscry, stdscrx);
 
@@ -143,7 +150,7 @@ int main (void)
     nodelay (menu_win, TRUE);
     nodelay (play_win, TRUE);
 
-    mvprintw (0, 0, "Mp3blatty");// by Devilisse");
+    mvprintw (0, 0, "Mp3blatty");
     mvprintw (stdscry - 1, stdscrx - 7, "v. 1.0");
     refresh ();
 
@@ -443,6 +450,7 @@ int main (void)
         }
 
         info_win_global_update (highlight, n_choices);
+        updateVol ();
         wrefresh (menu_win);
     }
 
@@ -452,18 +460,14 @@ int main (void)
     /* rimuovo i file temporanei */
     strcpy (buffer, "rm ");
     strcat (buffer, trackinfofile);
-    system (buffer);
-
-    strcpy (buffer, "rm ");
+    strcat (buffer, " ");
     strcat (buffer, tracklist);
-    system (buffer);
-
-    strcpy (buffer, "rm ");
-    strcat (buffer, playlistfile);
-    system (buffer);
-
-    strcpy (buffer, "rm ");
+    strcat (buffer, " ");
     strcat (buffer, timingfile);
+    strcat (buffer, " ");
+    strcat (buffer, playlistfile);
+    strcat (buffer, " ");
+    strcat (buffer, metadata);
     system (buffer);
 
     /* dealloco tutta la memoria per ncurses */
@@ -471,6 +475,43 @@ int main (void)
 
 
     return 0;
+}
+
+void updateVol (void)
+{
+    int i;
+
+    FILE *f;
+
+
+    /* volume */
+    //strcpy (buffer, "vl >& ");
+    strcpy (buffer, "pamixer --get-volume >& ");
+    strcat (buffer, metadata);
+    strcat (buffer, " &");
+    system (buffer);
+
+    f = fopen (metadata, "a+");
+    fscanf (f, "%d%%", &globalvolume);
+    //fscanf (f, "Vol: %d%%", &globalvolume);
+    fclose (f);
+
+    move (starty - 2, startx);
+    clrtoeol ();
+    printw ("Vol : [");
+    for (i = 0; i < (globalvolume / 5) && i < 20; i++) 
+        printw ("#");
+    for (; i < 20; i++)
+        printw (" ");
+    if (globalvolume >= 100)
+    {
+        move (starty - 2, startx + 26);
+        addch ('!');
+    }
+    printw ("] %d%%", globalvolume);
+    refresh ();
+
+    return ;
 }
 
 void updateplaytime (WINDOW *time_win)
@@ -860,7 +901,7 @@ void print_menu (WINDOW *win, int highlight, char **m, int len, int height, int 
                 for (cols = 0; m[i][cols] != '\0' && cols < (range - 3); cols++)
                     wprintw (win, "%c", m[i][cols]);
 
-                if (strlen (m[i]) >= (range - 3))
+                if (strlen (m[i]) > (range - 3))
                     wprintw (win, "...");
             }
         }
@@ -922,6 +963,7 @@ void createPlaylist (void)
 
         curs_set (0);
         updateplaytime (time_win);
+        updateVol ();
         move (starty - 1, startx + i + lineLen + 1);
         curs_set (1);
     }
@@ -1165,6 +1207,7 @@ void displayplaylists ()
 
             default:
                 updateplaytime (time_win);
+                updateVol ();
                 break;
         }
         
@@ -1334,6 +1377,7 @@ void playlistsinmenu (int n, WINDOW *local_info_win)
 
             default:
                 updateplaytime (time_win);
+                updateVol ();
                 info_win_global_update (highlight, n_tracks);
                 break;
         }
@@ -1525,6 +1569,7 @@ void addSongtoPlaylist (void)
 
             default:
                 updateplaytime (time_win);
+                updateVol ();
                 break;
         }
     
