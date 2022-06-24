@@ -479,17 +479,20 @@ int main (void)
 
 void updateVol (void)
 {
+    char *localBuffer;
+
     int i;
 
     FILE *f;
 
+    localBuffer = malloc (sizeof (char) * L);
 
     /* volume */
     //strcpy (buffer, "vl >& ");
-    strcpy (buffer, "pamixer --get-volume >& ");
-    strcat (buffer, metadata);
-    strcat (buffer, " &");
-    system (buffer);
+    strcpy (localBuffer, "pamixer --get-volume >& ");
+    strcat (localBuffer, metadata);
+    strcat (localBuffer, " &");
+    system (localBuffer);
 
     f = fopen (metadata, "a+");
     fscanf (f, "%d%%", &globalvolume);
@@ -510,6 +513,8 @@ void updateVol (void)
     }
     printw ("] %d%%", globalvolume);
     refresh ();
+
+    free (localBuffer);
 
     return ;
 }
@@ -1787,8 +1792,9 @@ int deleteplaylist (int highlight)
     }
     *(playlists + i - 1) = NULL;
 
-    strcpy (buffer, "rm ");
+    strcpy (buffer, "rm \"");
     strcat (buffer, name);
+    strcat (buffer, "\"");
     strcat (buffer, " ");
     strcat (buffer, playlistfile);
     system (buffer);
