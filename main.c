@@ -10,8 +10,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-// #include <unistd.h>
-// #include <signal.h>
 #include <ncurses.h>
 
 #define L 500
@@ -122,6 +120,8 @@ int main (void)
     randomnum = 1;
     choice = shuffleMode = timeShown = 0;
 
+    track.trackName = NULL;
+
     /* inzializzazione di ncurses */
     initscr();
     clear();
@@ -176,7 +176,7 @@ int main (void)
     system (buffer);
     playlists = playlistinit ();
 
-    for (track.trackName = NULL, isPaused = -1; ; )
+    for (isPaused = -1; ; )
     {
         wattron (menu_win, A_BOLD);
         wmove (menu_win, 1, 1);
@@ -217,9 +217,10 @@ int main (void)
             case ' ':
                 if (!trackplaying)
                 {
-                    choice = highlight;
+                    track.group_index = trackindex = choice = highlight;
                     isPaused = 0;
                     track.isPaused = 0;
+                    track.group_total = n_choices;
                     c = '\n';
                 }
                 else if (isPaused)
@@ -430,7 +431,7 @@ int main (void)
             fclose (fInfo);
 
             /* mpv --flags... tracks/"%s.mp4"> trackinfo.txt & */
-            refresh ();
+            //refresh ();
             strcpy (buffer, trackplay);
             strcat (buffer, " --input-ipc-server=/tmp/mpvsocket tracks/\"");
             strcat (buffer, choises[choice - 1]);
@@ -505,7 +506,7 @@ void updateVol (void)
     for (i = 0; i < (globalvolume / 5) && i < 20; i++) 
         printw ("#");
     for (; i < 20; i++)
-        printw (" ");
+        printw ("-");
     if (globalvolume >= 100)
     {
         move (starty - 2, startx + 26);
@@ -1339,8 +1340,8 @@ void playlistsinmenu (int n, WINDOW *local_info_win)
                 system (buffer);
                 fclose (f);
 
-                if (track.trackName != NULL)
-                    free (track.trackName);
+                //if (track.trackName != NULL)
+                    //free (track.trackName);
 
                 track.trackName = malloc (sizeof (char) * (strlen (songs[highlight - 1]) + 1));
                 strcpy (track.trackName, songs[highlight - 1]);
@@ -1348,25 +1349,7 @@ void playlistsinmenu (int n, WINDOW *local_info_win)
                 track.group_index = highlight;
                 track.group_total = n_tracks;
 
-                /*
-                werase (local_info_win);
-                local_info_win = NULL;
-                local_info_win = newwin (6, WIDTH, starty + HEIGHT, startx);
-                box (local_info_win, 0, 0);
-
-                 stampo la traccia avviata in info_win 
-                wmove (local_info_win, 2, 2);
-                wclrtoeol (local_info_win);
-                box (local_info_win, 0, 0);
-                wattron (local_info_win, A_BLINK);
-                wprintw (local_info_win, "- ");
-                wattroff (local_info_win, A_BLINK);
-                wprintw (local_info_win, "Playing: %s", *(songs + highlight - 1));
-                wrefresh (local_info_win); */
-
                 trackplaying = 1;
-                //trackindex = highlight;
-
                 break;
 
             case KEY_RIGHT:
@@ -1389,14 +1372,6 @@ void playlistsinmenu (int n, WINDOW *local_info_win)
 
         print_menu (menu_win, highlight, songs, n_tracks, HEIGHT, WIDTH);
         wrefresh (menu_win);
-
-        /*
-        for (c = 0; c < 7; c++)
-            mvwprintw (local_info_win, 1, 3 + c, " ");
-        mvwprintw (local_info_win, 1, 2, "%d/%d", highlight, n_tracks);
-        wrefresh (local_info_win); */
-
-
     }
 }
 
