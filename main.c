@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <ncurses.h>
 
 #define L 500
@@ -48,7 +49,7 @@ char *options[12] =
   "<F5>  Killall",
   "<F6>  Import ~/Downloads",
   "<F7>  New playlist",
-  "<F8>  Playlist menu",
+  "<F8>  Search track",
   "<F9>  Add songs to ply",
   "<F10> Shuffle mode",
   "<F11> Prev",
@@ -76,10 +77,13 @@ void addSongtoPlaylist (void);              /* aggiunge tracce a una playlist es
 void updateplaytime (WINDOW *);             /* aggiorna il timestamp della canzone in time_win*/
 void info_win_global_update (int, int);     /* aggiorna la info_win tramite le info di _t */
 void updateVol (void);
+void searchTrack (void);
+int songsInSearch (char *);
 
 char **choisesinit (void);                  /* inizializzatore delle tracce */
 char **playlistinit (void);                 /* inizializzatore delle playlist */
 char **matrixgenerator (char *, char **);   /* genera matrici da file */
+char *strtolower (char *);
 
 int system (char const *);
 int scanplaylists (void);           /* controlla per nuove playlist */
@@ -150,6 +154,25 @@ int main (void)
     nodelay (menu_win, TRUE);
     nodelay (play_win, TRUE);
 
+    /* creo il file con le tracce */
+    strcpy (buffer, "touch ");
+    strcat (buffer, tracklist);
+    system (buffer);
+    choises = choisesinit ();
+
+    strcpy (buffer, "touch ");
+    strcat (buffer, playlistfile);
+    system (buffer);
+    playlists = playlistinit ();
+
+    /* prevents a bug when first opening mp3blatty */
+    strcpy (buffer, "(cd tracks && mpv \"");
+    strcat (buffer, choises[0]);
+    strcat (buffer, "\") &");
+    system (buffer);
+    system ("killall mpv >& /dev/null");
+    erase ();
+
     mvprintw (0, 0, "Mp3blatty");
     mvprintw (stdscry - 1, stdscrx - 7, "v. 1.0");
     refresh ();
@@ -165,16 +188,6 @@ int main (void)
     box (time_win, 0, 0);
     wrefresh (time_win);
 
-    /* creo il file con le tracce */
-    strcpy (buffer, "touch ");
-    strcat (buffer, tracklist);
-    system (buffer);
-    choises = choisesinit ();
-
-    strcpy (buffer, "touch ");
-    strcat (buffer, playlistfile);
-    system (buffer);
-    playlists = playlistinit ();
 
     for (isPaused = -1; ; )
     {
@@ -290,8 +303,11 @@ int main (void)
                 createPlaylist ();
                 break;
 
-            /* apre la play_win */
             case KEY_F(8):
+                searchTrack ();
+                break;
+
+            /* apre la play_win */
             case KEY_LEFT:
             case KEY_RIGHT:
                 if (scanplaylists ())
@@ -473,6 +489,200 @@ int main (void)
 
     /* dealloco tutta la memoria per ncurses */
     endwin();
+
+
+    return 0;
+}
+
+void searchTrack (void)
+{
+    char *line = "Search: ";
+    char *localBuffer;
+
+    int c;
+    int i, j;
+    int y, x;
+    int lineLen;
+    
+    localBuffer = malloc (sizeof (char) * L);
+
+    lineLen = strlen (line);
+
+    wmove (menu_win, 1, 1);
+    wclrtoeol (menu_win);
+    wattron (menu_win, A_BOLD);
+    wprintw (menu_win, "Results:");
+    wattroff (menu_win, A_BOLD);
+    box (menu_win, 0, 0);
+    wrefresh (menu_win);
+
+    echo ();
+    nodelay (stdscr, FALSE);
+    curs_set(1);
+
+    move (starty - 1, startx);
+    clrtoeol ();
+    printw (line);
+
+    /* stampa del prompt di inserimento */
+    for (i = 0, *localBuffer = '\0'; (c = wgetch (stdscr)) != 27; i++)
+    {
+        switch (c)
+        {
+            case '\b':
+            case 127:
+            case KEY_BACKSPACE:
+                localBuffer[i - 1] = '\0';
+                i -= 2;
+                break;
+            
+            case 27:
+                noecho ();
+                curs_set (0);
+                nodelay (stdscr, TRUE);
+                move (starty - 1, startx);
+                clrtoeol ();
+                return;
+                break;
+
+            case '\n':
+                curs_set (0);
+                if (songsInSearch (localBuffer))
+                    i--;
+                break;
+
+            default:
+                localBuffer[i] = c;
+                localBuffer[i + 1] = '\0';
+                break;
+        }
+
+        move (starty - 1, startx);
+        clrtoeol ();
+        printw (line);
+        printw (localBuffer);
+        refresh ();
+
+        /* BACKSPACE quando non ci sono caratteri... */
+        if (i < -1)
+            i = -1;
+
+        curs_set (0);
+        updateplaytime (time_win);
+        updateVol ();
+
+        if (*localBuffer != '\0')
+        {
+            werase (menu_win);
+
+            clrtoeol ();
+
+            wmove (menu_win, 1, 1);
+            wclrtoeol (menu_win);
+            wattron (menu_win, A_BOLD);
+            wprintw (menu_win, "Results:");
+            wattroff (menu_win, A_BOLD);
+            wrefresh (menu_win);
+
+            move (0, 0);
+            for (x = 2, y = 2, j = 0; j < n_choices && y < HEIGHT - 2; j++)
+                if (strstr (strtolower (choises[j]), strtolower (localBuffer)) != NULL)
+                    mvwprintw (menu_win, y++, x, "%2d  %s\n", j + 1, choises[j]);
+
+            box (menu_win, 0, 0);
+            wrefresh (menu_win);
+        }
+        else
+            print_menu (menu_win, 1, choises, n_choices, HEIGHT, WIDTH);
+
+        wrefresh (menu_win);
+        move (starty - 1, startx + i + lineLen + 1);
+        curs_set (1);
+    }
+
+    noecho ();
+    curs_set (0);
+    nodelay (stdscr, TRUE);
+    move (starty - 1, startx);
+    clrtoeol ();
+
+    return ;
+}
+
+int songsInSearch (char *searching)
+{
+    char **allowedSongs;
+
+    int *indexes;
+    int found_n;
+    int highlight;
+    int c;
+    int y, x;
+    int i, j;
+
+    nodelay (menu_win, FALSE);
+
+    allowedSongs = malloc (sizeof (char *) * (n_choices + 1));
+    indexes = malloc (sizeof (int) * (n_choices + 1));
+
+    for (i = j = found_n = 0; i < n_choices; i++)
+        if (strstr (strtolower (choises[i]), strtolower (searching)) != NULL)
+        {    
+            *(allowedSongs + j) = malloc (sizeof (char) * (strlen (choises[i]) + 1));
+            strcpy (*(allowedSongs + j), choises[i]);
+            *(indexes + j) = i + 1;
+            found_n++;
+            j++;
+        }
+    *(allowedSongs + j) = NULL;
+
+    if (!j)
+        return 1;
+
+    werase (menu_win);
+    print_menu (menu_win, 1, allowedSongs, found_n, HEIGHT, WIDTH);
+    for (i = 0, y = x = 2; i < found_n; i++, y++)
+        mvwprintw (menu_win, y, x, "%2d", *(indexes + i));
+    wrefresh (menu_win);
+
+    for (highlight = 1; (c = wgetch (menu_win)) != 27; )
+    {
+        switch (c)
+        {
+            case KEY_UP:
+                if (highlight == 1)
+                    highlight = found_n;
+                else
+                    --highlight;
+                print_menu (menu_win, highlight, allowedSongs, found_n, HEIGHT, WIDTH);
+                for (i = 0, y = x = 2; i < found_n; i++, y++)
+                    mvwprintw (menu_win, y, x, "%2d", *(indexes + i));
+                wrefresh (menu_win);
+
+                break;
+
+            case KEY_DOWN:
+                if(highlight == found_n)
+                    highlight = 1;
+                else
+                    ++highlight;
+                print_menu (menu_win, highlight, allowedSongs, found_n, HEIGHT, WIDTH);
+                for (i = 0, y = x = 2; i < found_n; i++, y++)
+                    mvwprintw (menu_win, y, x, "%2d", *(indexes + i));
+                wrefresh (menu_win);
+                break;   
+        
+            case '\n':
+                break;
+
+            default:
+                nodelay (menu_win, TRUE);
+                return 0;
+                break;
+        }
+    }
+    nodelay (menu_win, TRUE);
+    
 
 
     return 0;
@@ -794,6 +1004,20 @@ char **matrixgenerator (char *s, char **m)
     return m; 
 }
 
+char *strtolower (char *s)
+{
+    char *localBuffer;
+
+    int i;
+
+    localBuffer = malloc (sizeof (char) * (strlen (s) + 1));
+
+    for (i = 0; *(s + i) != '\0'; i++)
+        *(localBuffer + i) = tolower (*(s + i));
+    *(localBuffer + i) = '\0';
+    
+    return localBuffer;
+}
 void print_menu (WINDOW *win, int highlight, char **m, int len, int height, int width)
 {
     int x, y, i, k, j;
@@ -1533,6 +1757,8 @@ void addSongtoPlaylist (void)
             case KEY_F(1):
                 move (starty - 1, startx);
                 printw ("Aborting from addSongToPlaylist ()");
+                werase (menu_win);
+                wrefresh (menu_win);
                 refresh ();
                 return ;
              
