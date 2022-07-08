@@ -78,7 +78,7 @@ void updateplaytime (WINDOW *);             /* aggiorna il timestamp della canzo
 void info_win_global_update (int, int);     /* aggiorna la info_win tramite le info di _t */
 void updateVol (void);
 void searchTrack (void);
-int songsInSearch (char *);
+char songsInSearch (char *);
 
 char **choisesinit (void);                  /* inizializzatore delle tracce */
 char **playlistinit (void);                 /* inizializzatore delle playlist */
@@ -500,7 +500,7 @@ void searchTrack (void)
     char *localBuffer;
 
     int c;
-    int i, j;
+    int i, j, k;
     int y, x;
     int lineLen;
     
@@ -535,19 +535,22 @@ void searchTrack (void)
                 localBuffer[i - 1] = '\0';
                 i -= 2;
                 break;
-            
-            case 27:
-                noecho ();
-                curs_set (0);
-                nodelay (stdscr, TRUE);
-                move (starty - 1, startx);
-                clrtoeol ();
-                return;
-                break;
 
             case '\n':
                 curs_set (0);
-                if (songsInSearch (localBuffer))
+                c = songsInSearch (localBuffer);
+
+                if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'))
+                {
+                    localBuffer[i] = c;
+                    localBuffer[i + 1] = '\0';
+                }
+                else if (c == 1)
+                {
+                    localBuffer[i - 1] = '\0';
+                    i -= 2;
+                }
+                else
                     i--;
                 break;
 
@@ -587,8 +590,17 @@ void searchTrack (void)
             move (0, 0);
             for (x = 2, y = 2, j = 0; j < n_choices && y < HEIGHT - 2; j++)
                 if (strstr (strtolower (choises[j]), strtolower (localBuffer)) != NULL)
-                    mvwprintw (menu_win, y++, x, "%2d  %s\n", j + 1, choises[j]);
+                { 
+                    mvwprintw (menu_win, y, x, "%2d  ", j + 1);
 
+                    for (k = 0; choises[j][k] != '\0' && k < (WIDTH - 9); k++)
+                        wprintw (menu_win, "%c", choises[j][k]);
+
+                    if (strlen (choises[j]) >= (WIDTH - 9))
+                        wprintw (menu_win, "...");
+
+                    y++;
+                }
             box (menu_win, 0, 0);
             wrefresh (menu_win);
         }
@@ -602,14 +614,14 @@ void searchTrack (void)
 
     noecho ();
     curs_set (0);
-    nodelay (stdscr, TRUE);
     move (starty - 1, startx);
+    nodelay (stdscr, TRUE);
     clrtoeol ();
 
     return ;
 }
 
-int songsInSearch (char *searching)
+char songsInSearch (char *searching)
 {
     char **allowedSongs;
 
@@ -617,7 +629,7 @@ int songsInSearch (char *searching)
     int found_n;
     int highlight;
     int c;
-    int y, x;
+    //int y, x;
     int i, j;
 
     nodelay (menu_win, FALSE);
@@ -637,12 +649,10 @@ int songsInSearch (char *searching)
     *(allowedSongs + j) = NULL;
 
     if (!j)
-        return 1;
+        return 0;
 
     werase (menu_win);
     print_menu (menu_win, 1, allowedSongs, found_n, HEIGHT, WIDTH);
-    for (i = 0, y = x = 2; i < found_n; i++, y++)
-        mvwprintw (menu_win, y, x, "%2d", *(indexes + i));
     wrefresh (menu_win);
 
     for (highlight = 1; (c = wgetch (menu_win)) != 27; )
@@ -655,10 +665,6 @@ int songsInSearch (char *searching)
                 else
                     --highlight;
                 print_menu (menu_win, highlight, allowedSongs, found_n, HEIGHT, WIDTH);
-                for (i = 0, y = x = 2; i < found_n; i++, y++)
-                    mvwprintw (menu_win, y, x, "%2d", *(indexes + i));
-                wrefresh (menu_win);
-
                 break;
 
             case KEY_DOWN:
@@ -667,23 +673,24 @@ int songsInSearch (char *searching)
                 else
                     ++highlight;
                 print_menu (menu_win, highlight, allowedSongs, found_n, HEIGHT, WIDTH);
-                for (i = 0, y = x = 2; i < found_n; i++, y++)
-                    mvwprintw (menu_win, y, x, "%2d", *(indexes + i));
-                wrefresh (menu_win);
                 break;   
         
             case '\n':
                 break;
 
+            case KEY_BACKSPACE:
+                return 1; //KEY_BACKSPACE;
+                break;
+
             default:
                 nodelay (menu_win, TRUE);
-                return 0;
+                curs_set (1); 
+                return c;
                 break;
         }
     }
     nodelay (menu_win, TRUE);
-    
-
+    curs_set (1); 
 
     return 0;
 }
