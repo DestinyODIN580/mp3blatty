@@ -52,7 +52,7 @@ char *options[12] =
   "<F8>  Search track",
   "<F9>  Add songs to ply",
   "<F10> Shuffle mode",
-  "<F11> Prev",
+  "<F11> Loop",
   "<F12> Next",
   //"<TAB> Quit",
 };
@@ -77,7 +77,7 @@ void addSongtoPlaylist (void);              /* aggiunge tracce a una playlist es
 void updateplaytime (WINDOW *);             /* aggiorna il timestamp della canzone in time_win*/
 void info_win_global_update (int, int);     /* aggiorna la info_win tramite le info di _t */
 void updateVol (void);
-void searchTrack (void);
+void searchTrack (char);
 char songsInSearch (char *);
 
 char **choisesinit (void);                  /* inizializzatore delle tracce */
@@ -115,6 +115,7 @@ int main (void)
     int highlight = 1;  /* cursore */
     int choice = 0;     /* traccia scelta */
     int isPaused;
+    int loop;
     int timeShown;
     int c;              /* carattere in input */
     int i;              /* contatori */
@@ -122,7 +123,7 @@ int main (void)
     FILE *fInfo;        /* file delle informazioni */
 
     randomnum = 1;
-    choice = shuffleMode = timeShown = 0;
+    loop = choice = shuffleMode = timeShown = 0;
 
     track.trackName = NULL;
 
@@ -210,174 +211,199 @@ int main (void)
             refresh ();
         }
 
-        switch (c)
-        {
-            case KEY_UP:
-                if (highlight == 1)
-                    highlight = n_choices;
-                else
-                    --highlight;
-                break;
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'))
+            searchTrack (c);
+        else
+            switch (c)
+            {
+                case KEY_UP:
+                    if (highlight == 1)
+                        highlight = n_choices;
+                    else
+                        --highlight;
+                    break;
 
-            case KEY_DOWN:
-                if(highlight == n_choices)
-                    highlight = 1;
-                else
-                    ++highlight;
-                break;
+                    case KEY_DOWN:
+                        if(highlight == n_choices)
+                            highlight = 1;
+                        else
+                            ++highlight;
+                        break;
 
-            /* play/pause */
-            case ' ':
-                if (!trackplaying)
-                {
-                    track.group_index = trackindex = choice = highlight;
-                    isPaused = 0;
-                    track.isPaused = 0;
-                    track.group_total = n_choices;
-                    c = '\n';
+                    /* play/pause */
+                    case ' ':
+                        if (!trackplaying)
+                        {
+                            track.group_index = trackindex = choice = highlight;
+                            isPaused = 0;
+                            track.isPaused = 0;
+                            track.group_total = n_choices;
+                            c = '\n';
+                        }
+                        else if (isPaused)
+                        {
+                            system ("echo \'{ \"command\": [\"set_property\", \"pause\", false] }' | socat \
+                            - /tmp/mpvsocket >& /dev/null");
+                            isPaused = 0;
+                            track.isPaused = 0;
+                        }
+                        else
+                        {
+                            system ("echo \'{ \"command\": [\"set_property\", \"pause\", true] }' | socat \
+                            - /tmp/mpvsocket >& /dev/null");
+                            isPaused = 1;
+                            track.isPaused = 1;
+                        }
+                        break;
+
+                    /* play */
+                    case KEY_F(1):
+                        system ("echo \'{ \"command\": [\"set_property\", \"pause\", false] }' | socat \
+                        - /tmp/mpvsocket >& /dev/null");
+                        isPaused = 0;
+                        track.isPaused = 0;
+                        break;
+
+                    /* pause */
+                    case KEY_F(2):
+                        system ("echo \'{ \"command\": [\"set_property\", \"pause\", true] }' | socat \
+                        - /tmp/mpvsocket >& /dev/null");
+                        isPaused = 1;
+                        track.isPaused = 1;
+                        break;
+
+                    /* traccia casuale */
+                    case KEY_F(3):
+                        if (rand > 0)
+                            trackindex = highlight = choice = rand;
+                        else
+                            trackindex = highlight = choice = 1;
+                        c = '\n';
+                        break;
+
+                    /* spostamento delle tracce da Downloads a tracks */
+                    case KEY_F(6):
+                        system ("pd=$(pwd); cd $HOME/Downloads; mv *.mp* $pd/tracks >& \
+                        /dev/null");
+                        /* non mettere break e'volontario, come l'ordine dei case */
+
+                    /* refresh del file delle tracce */
+                    case KEY_F(4):
+                        system ("killall mpv >& /dev/null");
+                        choisesinit (); 
+                        highlight = 1;
+                        trackplaying = 0;
+                        break;
+
+                    /* uccisione processi mpv */
+                    case KEY_F(5):
+                    case 'q':
+                        system ("killall mpv >& /dev/null");
+                        trackplaying = 0;
+                        break;
+
+                    /* nuova playlist */
+                    case KEY_F(7):
+                        createPlaylist ();
+                        break;
+
+                    case KEY_F(8):
+                        searchTrack ('\0');
+                        break;
+
+                    /* apre la play_win */
+                    case KEY_LEFT:
+                    case KEY_RIGHT:
+                        if (scanplaylists ())
+                            displayplaylists ();
+                        else
+                        {
+                            mvprintw (starty - 1, startx, "Nessuna playlist trovata");
+                            refresh ();
+                        }
+                        break;
+
+                    /* aggiunge canzoni alla playlist esistente */
+                    case KEY_F(9):
+                        addSongtoPlaylist ();
+                        continue;
+                        break;
+
+                    case KEY_F(10):
+                        if (!shuffleMode)
+                        {       
+                            move (starty - 1, startx);
+                            clrtoeol ();
+                            printw ("Shuffle mode ON");
+                            refresh ();
+                            shuffleMode = 1;
+                        }
+                        else
+                        {
+                            move (starty - 1, startx);
+                            clrtoeol ();
+                            printw ("Shuffle mode OFF");
+                            refresh ();
+                            shuffleMode = 0;
+                        }
+                        break;
+
+                    /* traccia precedente */
+                    case KEY_F(11):
+                        if (!loop)
+                        {
+                            move (starty - 1, startx);
+                            clrtoeol ();
+                            printw ("Loop ON");
+                            refresh ();
+                            loop = 1;
+                        }
+                        else
+                        {
+                            move (starty - 1, startx);
+                            clrtoeol ();
+                            printw ("Loop OFF");
+                            refresh ();
+                            loop = 0;
+                        }
+                        break;
+                        
+
+
+                    /*
+                        if (highlight == 1)
+                            trackindex = highlight = choice = n_choices;
+                        else if (trackindex > -1)
+                            trackindex = highlight = choice = trackindex - 1;
+                        c = '\n';
+                        break;
+                    */
+
+                    /* traccia successiva */
+                    case KEY_F(12):
+                        if (highlight == n_choices)
+                            trackindex = highlight = choice = 1;
+                        else if (trackindex > - 1)
+                            trackindex = highlight = choice = trackindex + 1;
+                        c = '\n';
+                        break;
+
+                    /* uscita dal programma */
+                    case '\t':
+                        choice = -1;
+                        break;
+
+                    /* selezione della traccia */
+                    case '\n':
+                        trackindex = choice = highlight;
+                        isPaused = 0;
+                        track.isPaused = 0;
+                        break;
+
+                    default:
+                        wrefresh (menu_win);
+                        break;
                 }
-                else if (isPaused)
-                {
-                    system ("echo \'{ \"command\": [\"set_property\", \"pause\", false] }' | socat \
-                    - /tmp/mpvsocket >& /dev/null");
-                    isPaused = 0;
-                    track.isPaused = 0;
-                }
-                else
-                {
-                    system ("echo \'{ \"command\": [\"set_property\", \"pause\", true] }' | socat \
-                    - /tmp/mpvsocket >& /dev/null");
-                    isPaused = 1;
-                    track.isPaused = 1;
-                }
-                break;
-
-            /* play */
-            case KEY_F(1):
-                system ("echo \'{ \"command\": [\"set_property\", \"pause\", false] }' | socat \
-                - /tmp/mpvsocket >& /dev/null");
-                isPaused = 0;
-                track.isPaused = 0;
-                break;
-
-            /* pause */
-            case KEY_F(2):
-                system ("echo \'{ \"command\": [\"set_property\", \"pause\", true] }' | socat \
-                - /tmp/mpvsocket >& /dev/null");
-                isPaused = 1;
-                track.isPaused = 1;
-                break;
-
-            /* traccia casuale */
-            case KEY_F(3):
-                if (rand > 0)
-                    trackindex = highlight = choice = rand;
-                else
-                    trackindex = highlight = choice = 1;
-                c = '\n';
-                break;
-
-            /* spostamento delle tracce da Downloads a tracks */
-            case KEY_F(6):
-                system ("pd=$(pwd); cd $HOME/Downloads; mv *.mp* $pd/tracks >& \
-                /dev/null");
-                /* non mettere break e'volontario, come l'ordine dei case */
-
-            /* refresh del file delle tracce */
-            case KEY_F(4):
-                system ("killall mpv >& /dev/null");
-                choisesinit (); 
-                highlight = 1;
-                trackplaying = 0;
-                break;
-
-            /* uccisione processi mpv */
-            case KEY_F(5):
-            case 'q':
-                system ("killall mpv >& /dev/null");
-                trackplaying = 0;
-                break;
-
-            /* nuova playlist */
-            case KEY_F(7):
-                createPlaylist ();
-                break;
-
-            case KEY_F(8):
-                searchTrack ();
-                break;
-
-            /* apre la play_win */
-            case KEY_LEFT:
-            case KEY_RIGHT:
-                if (scanplaylists ())
-                    displayplaylists ();
-                else
-                {
-                    mvprintw (starty - 1, startx, "Nessuna playlist trovata");
-                    refresh ();
-                }
-                break;
-
-            /* aggiunge canzoni alla playlist esistente */
-            case KEY_F(9):
-                addSongtoPlaylist ();
-                continue;
-                break;
-
-            case KEY_F(10):
-                if (!shuffleMode)
-                {       
-                    move (starty - 1, startx);
-                    clrtoeol ();
-                    printw ("Shuffle mode ON");
-                    refresh ();
-                    shuffleMode = 1;
-                }
-                else
-                {
-                    move (starty - 1, startx);
-                    clrtoeol ();
-                    printw ("Shuffle mode OFF");
-                    refresh ();
-                    shuffleMode = 0;
-                }
-                break;
-
-            /* traccia precedente */
-            case KEY_F(11):
-                if (highlight == 1)
-                    trackindex = highlight = choice = n_choices;
-                else if (trackindex > -1)
-                    trackindex = highlight = choice = trackindex - 1;
-                c = '\n';
-                break;
-
-            /* traccia successiva */
-            case KEY_F(12):
-                if (highlight == n_choices)
-                    trackindex = highlight = choice = 1;
-                else if (trackindex > - 1)
-                    trackindex = highlight = choice = trackindex + 1;
-                c = '\n';
-                break;
-
-            /* uscita dal programma */
-            case '\t':
-                choice = -1;
-                break;
-
-            /* selezione della traccia */
-            case '\n':
-                trackindex = choice = highlight;
-                isPaused = 0;
-                track.isPaused = 0;
-                break;
-
-            default:
-                wrefresh (menu_win);
-                break;
-        }
 
         /* ristampa tutto per tenere aggiornato */ 
         print_menu (menu_win, highlight, choises, n_choices, HEIGHT, WIDTH);
@@ -404,7 +430,9 @@ int main (void)
                 c = '\n';
 
                 /* scorro alla traccia successiva */
-                if (!shuffleMode)
+                if(loop)
+                   c='\n';
+                else if (!shuffleMode)
                 {
                     if (choice < n_choices)
                     {
@@ -494,7 +522,7 @@ int main (void)
     return 0;
 }
 
-void searchTrack (void)
+void searchTrack (char input)
 {
     char *line = "Search: ";
     char *localBuffer;
@@ -505,6 +533,8 @@ void searchTrack (void)
     int lineLen;
     
     localBuffer = malloc (sizeof (char) * L);
+    *localBuffer = input;
+    *(localBuffer + 1) = '\0';
 
     lineLen = strlen (line);
 
@@ -523,42 +553,52 @@ void searchTrack (void)
     move (starty - 1, startx);
     clrtoeol ();
     printw (line);
+    printw (localBuffer);
 
     /* stampa del prompt di inserimento */
-    for (i = 0, *localBuffer = '\0'; (c = wgetch (stdscr)) != 27; i++)
+    for (i = 1; (c = wgetch (stdscr)) != 27; i++)
     {
-        switch (c)
+        if ((c <= 'z' && c >= 'a') || (c >= 'A' && c <= 'Z'))
         {
-            case '\b':
-            case 127:
-            case KEY_BACKSPACE:
-                localBuffer[i - 1] = '\0';
-                i -= 2;
-                break;
-
-            case '\n':
-                curs_set (0);
-                c = songsInSearch (localBuffer);
-
-                if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'))
-                {
-                    localBuffer[i] = c;
-                    localBuffer[i + 1] = '\0';
-                }
-                else if (c == 1)
-                {
+            *(localBuffer + i) = c;
+            *(localBuffer + i + 1) = '\0';
+            songsInSearch (localBuffer);
+        }
+        else
+            switch (c)
+            {
+                case '\b':
+                case 127:
+                case KEY_BACKSPACE:
                     localBuffer[i - 1] = '\0';
                     i -= 2;
-                }
-                else
-                    i--;
-                break;
+                    break;
 
-            default:
-                localBuffer[i] = c;
-                localBuffer[i + 1] = '\0';
-                break;
-        }
+                case KEY_UP:
+                case KEY_DOWN:
+                case '\n':
+                    curs_set (0);
+                    c = songsInSearch (localBuffer);
+
+                    if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'))
+                    {
+                        localBuffer[i] = c;
+                        localBuffer[i + 1] = '\0';
+                    }
+                    else if (c == 1)
+                    {
+                        localBuffer[i - 1] = '\0';
+                        i -= 2;
+                    }
+                    else
+                        i--;
+                    break;
+
+                default:
+                    localBuffer[i] = c;
+                    localBuffer[i + 1] = '\0';
+                    break;
+            }
 
         move (starty - 1, startx);
         clrtoeol ();
@@ -629,10 +669,11 @@ char songsInSearch (char *searching)
     int found_n;
     int highlight;
     int c;
-    //int y, x;
     int i, j;
 
-    nodelay (menu_win, FALSE);
+    FILE *fInfo;
+
+    nodelay (stdscr, FALSE);
 
     allowedSongs = malloc (sizeof (char *) * (n_choices + 1));
     indexes = malloc (sizeof (int) * (n_choices + 1));
@@ -676,6 +717,33 @@ char songsInSearch (char *searching)
                 break;   
         
             case '\n':
+                trackplaying = 1;
+                //isPaused = 0;
+
+                system ("killall mpv >& /dev/null");
+
+                /* resetto il file */
+                fInfo = fopen (trackinfofile, "w");
+                fclose (fInfo);
+
+                /* mpv --flags... tracks/"%s.mp4"> trackinfo.txt & */
+                //refresh ();
+                strcpy (buffer, trackplay);
+                strcat (buffer, " --input-ipc-server=/tmp/mpvsocket tracks/\"");
+                strcat (buffer, allowedSongs[highlight - 1]);
+                strcat (buffer, "\" >& ");// > "); // &
+                strcat (buffer, trackinfofile);
+                strcat (buffer, " &");
+                system (buffer);
+
+                if (track.trackName != NULL)
+                    free (track.trackName);
+
+                track.trackName = malloc (sizeof (char) * (strlen (allowedSongs[highlight - 1]) + 1));
+                strcpy (track.trackName, allowedSongs[highlight - 1]);
+
+                track.group_index = highlight;
+                track.group_total = j;
                 break;
 
             case KEY_BACKSPACE:
