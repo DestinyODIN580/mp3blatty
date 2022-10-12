@@ -78,7 +78,7 @@ void updateplaytime (WINDOW *);             /* aggiorna il timestamp della canzo
 void info_win_global_update (int, int);     /* aggiorna la info_win tramite le info di _t */
 void updateVol (void);
 void searchTrack (char);
-char songsInSearch (char *);
+char songsInSearch (char *, int);
 
 char **choisesinit (void);                  /* inizializzatore delle tracce */
 char **playlistinit (void);                 /* inizializzatore delle playlist */
@@ -530,13 +530,12 @@ void searchTrack (char input)
     int c;
     int i, j, k;
     int y, x;
+    int out;
     int lineLen;
     
     localBuffer = malloc (sizeof (char) * L);
-    *localBuffer = input;
-    *(localBuffer + 1) = '\0';
-
     lineLen = strlen (line);
+
 
     wmove (menu_win, 1, 1);
     wclrtoeol (menu_win);
@@ -553,17 +552,19 @@ void searchTrack (char input)
     move (starty - 1, startx);
     clrtoeol ();
     printw (line);
-    printw (localBuffer);
+    keypad (stdscr, TRUE);
 
     /* stampa del prompt di inserimento */
-    for (i = 1; (c = wgetch (stdscr)) != 27; i++)
+    for (i = 0, c = input, out = 0; c != '\n' && !out; i++, c = wgetch (stdscr))
     {
         if ((c <= 'z' && c >= 'a') || (c >= 'A' && c <= 'Z'))
         {
             *(localBuffer + i) = c;
             *(localBuffer + i + 1) = '\0';
-            songsInSearch (localBuffer);
+            songsInSearch (localBuffer, 0);
         }
+        else if (c == KEY_RIGHT || c == KEY_LEFT)
+            break;
         else
             switch (c)
             {
@@ -578,7 +579,7 @@ void searchTrack (char input)
                 case KEY_DOWN:
                 case '\n':
                     curs_set (0);
-                    c = songsInSearch (localBuffer);
+                    c = songsInSearch (localBuffer, 1);
 
                     if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'))
                     {
@@ -593,7 +594,7 @@ void searchTrack (char input)
                     else
                         i--;
                     break;
-
+                    
                 default:
                     localBuffer[i] = c;
                     localBuffer[i + 1] = '\0';
@@ -661,7 +662,7 @@ void searchTrack (char input)
     return ;
 }
 
-char songsInSearch (char *searching)
+char songsInSearch (char *searching, int active)
 {
     char **allowedSongs;
 
@@ -689,14 +690,14 @@ char songsInSearch (char *searching)
         }
     *(allowedSongs + j) = NULL;
 
-    if (!j)
+    if (!j || !active)
         return 0;
 
     werase (menu_win);
     print_menu (menu_win, 1, allowedSongs, found_n, HEIGHT, WIDTH);
     wrefresh (menu_win);
 
-    for (highlight = 1; (c = wgetch (menu_win)) != 27; )
+    for (highlight = 1; (c = wgetch (stdscr)) != 27; )
     {
         switch (c)
         {
@@ -1093,6 +1094,7 @@ char *strtolower (char *s)
     
     return localBuffer;
 }
+
 void print_menu (WINDOW *win, int highlight, char **m, int len, int height, int width)
 {
     int x, y, i, k, j;
