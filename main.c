@@ -53,7 +53,8 @@ char *options[12] =
   "<F9>  Add songs to ply",
   "<F10> Shuffle mode",
   "<F11> Loop",
-  "<F12> Next",
+  "<F12> Toggle video",
+  //"<F12> Next",
   //"<TAB> Quit",
 };
 
@@ -99,6 +100,7 @@ struct _t
     int time_position;      /* timestamp attuale */
     int time_duration;      /* durata della canzone */
     int isPaused;           /* 1 si 0 no */
+    int showVid;            /* 1 si 0 no */
 
     int group_index;        /* indice della canzone */
     int group_total;        /* totale di canzoni nel gruppo */
@@ -126,6 +128,7 @@ int main (void)
     loop = choice = shuffleMode = timeShown = 0;
 
     track.trackName = NULL;
+    track.isPaused = 0;
 
     /* inzializzazione di ncurses */
     initscr();
@@ -381,11 +384,18 @@ int main (void)
 
                     /* traccia successiva */
                     case KEY_F(12):
+                        /*
                         if (highlight == n_choices)
                             trackindex = highlight = choice = 1;
                         else if (trackindex > - 1)
                             trackindex = highlight = choice = trackindex + 1;
                         c = '\n';
+                        break;*/
+
+                        if (track.showVid)
+                            track.showVid = 0;
+                        else
+                            track.showVid = 1;
                         break;
 
                     /* uscita dal programma */
@@ -477,7 +487,10 @@ int main (void)
             /* mpv --flags... tracks/"%s.mp4"> trackinfo.txt & */
             //refresh ();
             strcpy (buffer, trackplay);
-            strcat (buffer, " --input-ipc-server=/tmp/mpvsocket tracks/\"");
+            strcat (buffer, " --input-ipc-server=/tmp/mpvsocket "); //tracks/\"
+            if (!track.showVid)
+                strcat (buffer, "--vid=no ");
+            strcat (buffer, "tracks/\"");
             strcat (buffer, choises[choice - 1]);
             strcat (buffer, "\" >& ");// > "); // &
             strcat (buffer, trackinfofile);
@@ -1633,7 +1646,10 @@ void playlistsinmenu (int n, WINDOW *local_info_win)
 
                 /* mpv --flags... tracks/"%s.mp4"> trackinfo.txt & */
                 strcpy (buffer, trackplay);
-                strcat (buffer, " --input-ipc-server=/tmp/mpvsocket tracks/\"");
+                strcat (buffer, " --input-ipc-server=/tmp/mpvsocket ");
+                if (!track.showVid)
+                    strcat (buffer, "--vid=no ");
+                strcat (buffer, "tracks/\"");
                 strcat (buffer, *(songs + highlight - 1));
                 strcat (buffer, "\" >& ");
                 strcat (buffer, trackinfofile);
@@ -1934,7 +1950,8 @@ void addSongtoPlaylist (void)
     fileSongs = malloc (sizeof (char *) * (i + 1));
     for (rewind (fIn), j = k = 0; k < i; j++)
     {
-            c = fgetc (f);
+//            c = fgetc (f);
+              c = fgetc (fIn);
 
             if (c == EOF)
                 break;
