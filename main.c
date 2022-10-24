@@ -982,6 +982,17 @@ char **choisesinit (void)
     fclose (f);
     n_choices = j;
 
+    /* sorting per ordine alfabetico, non per ASCII */
+    for (i = 0; i < n_choices - 1; i++)
+        for (j = 0; j < n_choices - 1; j++)
+            if (strcmp (strtolower (*(choises + j)), strtolower (*(choises + j + 1))) > 0)
+            {
+                strcpy (localBuffer, *(choises + j));         
+                *(choises + j) = malloc (sizeof (char) * (strlen (*(choises + j + 1)) + 1));
+                strcpy (*(choises + j), *(choises + j + 1));
+                *(choises + j + 1) = malloc (sizeof (char) * (strlen (localBuffer) + 1));
+                strcpy (*(choises + j + 1), localBuffer); 
+            }
 
     return choises;
 }
