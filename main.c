@@ -22,7 +22,7 @@ char *trackinfofile = "trackinfo.txt";   /* file con le info della traccia */
 char *playlistfile = "playlistnames.txt";/* file con la lista delle playlist */
 char *timingfile = "posizione.txt";      /* file con il tempo della traccia */
 char *metadata = "data.txt";
-char *trackplay = "mpv ";                /* lettore */
+char *trackplayer = "mpv ";                /* lettore */
 
 char buffer[L]; /* buffer generico */
 
@@ -79,8 +79,9 @@ void updateplaytime (WINDOW *);             /* aggiorna il timestamp della canzo
 void info_win_global_update (int, int);     /* aggiorna la info_win tramite le info di _t */
 void updateVol (void);
 void searchTrack (char);
-char songsInSearch (char *, int);
+void playSong (char *, int, int);
 
+char songsInSearch (char *, int);
 char **choisesinit (void);                  /* inizializzatore delle tracce */
 char **playlistinit (void);                 /* inizializzatore delle playlist */
 char **matrixgenerator (char *, char **);   /* genera matrici da file */
@@ -129,6 +130,7 @@ int main (void)
 
     track.trackName = NULL;
     track.isPaused = 0;
+    track.showVid = 0;
 
     /* inzializzazione di ncurses */
     initscr();
@@ -478,33 +480,7 @@ int main (void)
             trackplaying = 1;
             isPaused = 0;
 
-            system ("killall mpv >& /dev/null");
-
-            /* resetto il file */
-            fInfo = fopen (trackinfofile, "w");
-            fclose (fInfo);
-
-            /* mpv --flags... tracks/"%s.mp4"> trackinfo.txt & */
-            //refresh ();
-            strcpy (buffer, trackplay);
-            strcat (buffer, " --input-ipc-server=/tmp/mpvsocket "); //tracks/\"
-            if (!track.showVid)
-                strcat (buffer, "--vid=no ");
-            strcat (buffer, "tracks/\"");
-            strcat (buffer, choises[choice - 1]);
-            strcat (buffer, "\" >& ");// > "); // &
-            strcat (buffer, trackinfofile);
-            strcat (buffer, " &");
-            system (buffer);
-
-            if (track.trackName != NULL)
-                free (track.trackName);
-
-            track.trackName = malloc (sizeof (char) * (strlen (choises[choice - 1]) + 1));
-            strcpy (track.trackName, choises[choice - 1]);
-
-            track.group_index = trackindex;
-            track.group_total = n_choices;
+            playSong (choises[choice - 1], trackindex, n_choices);
         }
 
         info_win_global_update (highlight, n_choices);
@@ -533,6 +509,42 @@ int main (void)
 
 
     return 0;
+}
+
+void playSong (char *songTitle, int trackIndex, int trackTotal)
+{
+    char *localBuffer;
+
+    FILE *fInfo;
+
+    localBuffer = malloc (sizeof (char) * L);
+
+
+    system ("killall mpv >& /dev/null");
+    fInfo = fopen (trackinfofile, "w");
+    fclose (fInfo);
+
+    strcpy (localBuffer, trackplayer);
+    strcat (localBuffer, " --input-ipc-server=/tmp/mpvsocket ");
+    if (!track.showVid)
+        strcat (localBuffer, "--vid=no ");
+    strcat (localBuffer, "tracks/\"");
+    strcat (localBuffer, songTitle);
+    strcat (localBuffer, "\" >& ");
+    strcat (localBuffer, trackinfofile);
+    strcat (localBuffer, " &");
+    system (localBuffer);
+
+    if (track.trackName != NULL)
+        free (track.trackName);
+
+    track.trackName = malloc (sizeof (char) * (strlen (songTitle) + 1));
+    strcpy (track.trackName, songTitle);
+
+    track.group_index = trackIndex;
+    track.group_total = trackTotal;
+
+    return ;
 }
 
 void searchTrack (char input)
@@ -685,7 +697,6 @@ char songsInSearch (char *searching, int active)
     int c;
     int i, j;
 
-    FILE *fInfo;
 
     nodelay (stdscr, FALSE);
 
@@ -734,30 +745,7 @@ char songsInSearch (char *searching, int active)
                 trackplaying = 1;
                 //isPaused = 0;
 
-                system ("killall mpv >& /dev/null");
-
-                /* resetto il file */
-                fInfo = fopen (trackinfofile, "w");
-                fclose (fInfo);
-
-                /* mpv --flags... tracks/"%s.mp4"> trackinfo.txt & */
-                //refresh ();
-                strcpy (buffer, trackplay);
-                strcat (buffer, " --input-ipc-server=/tmp/mpvsocket tracks/\"");
-                strcat (buffer, allowedSongs[highlight - 1]);
-                strcat (buffer, "\" >& ");// > "); // &
-                strcat (buffer, trackinfofile);
-                strcat (buffer, " &");
-                system (buffer);
-
-                if (track.trackName != NULL)
-                    free (track.trackName);
-
-                track.trackName = malloc (sizeof (char) * (strlen (allowedSongs[highlight - 1]) + 1));
-                strcpy (track.trackName, allowedSongs[highlight - 1]);
-
-                track.group_index = highlight;
-                track.group_total = j;
+                playSong (allowedSongs[highlight - 1], highlight, j);
                 break;
 
             case KEY_BACKSPACE:
@@ -1614,7 +1602,6 @@ void playlistsinmenu (int n, WINDOW *local_info_win)
     int highlight;
     int n_tracks;
 
-    FILE *f;
 
     songs = NULL;
 
@@ -1651,32 +1638,7 @@ void playlistsinmenu (int n, WINDOW *local_info_win)
                 break;
 
             case '\n':
-                system ("killall mpv >& /dev/null");
-
-                f = fopen (trackinfofile, "w");
-
-                /* mpv --flags... tracks/"%s.mp4"> trackinfo.txt & */
-                strcpy (buffer, trackplay);
-                strcat (buffer, " --input-ipc-server=/tmp/mpvsocket ");
-                if (!track.showVid)
-                    strcat (buffer, "--vid=no ");
-                strcat (buffer, "tracks/\"");
-                strcat (buffer, *(songs + highlight - 1));
-                strcat (buffer, "\" >& ");
-                strcat (buffer, trackinfofile);
-                strcat (buffer, " &");
-                system (buffer);
-                fclose (f);
-
-                //if (track.trackName != NULL)
-                    //free (track.trackName);
-
-                track.trackName = malloc (sizeof (char) * (strlen (songs[highlight - 1]) + 1));
-                strcpy (track.trackName, songs[highlight - 1]);
-                
-                track.group_index = highlight;
-                track.group_total = n_tracks;
-
+                playSong (*(songs + highlight - 1), highlight, n_tracks);
                 trackplaying = 1;
                 break;
 
