@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <unistd.h>
 #include <ncurses.h>
 
 #define L 500
@@ -442,8 +443,8 @@ int main (void)
                 c = '\n';
 
                 /* scorro alla traccia successiva */
-                if(loop)
-                   c='\n';
+                if (loop)
+                   c = '\n';
                 else if (!shuffleMode)
                 {
                     if (choice < n_choices)
@@ -486,6 +487,7 @@ int main (void)
         info_win_global_update (highlight, n_choices);
         updateVol ();
         wrefresh (menu_win);
+        usleep (1000);
     }
 
     /* termino tutti i processi mpv */
