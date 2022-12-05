@@ -55,8 +55,6 @@ char *options[12] =
   "<F10> Shuffle mode",
   "<F11> Loop",
   "<F12> Toggle video",
-  //"<F12> Next",
-  //"<TAB> Quit",
 };
 
 int n_choices = 0;      /* numero di tracce */
@@ -93,6 +91,9 @@ int scanplaylists (void);           /* controlla per nuove playlist */
 int deleteplaylist (int);           /* cancella una playlist */
 int globalvolume;
 
+int randInt (int);
+unsigned int randomnum = -1;    /* numero casuale */
+
 /* descrittore traccia */
 struct _t
 {
@@ -111,8 +112,6 @@ struct _t track;
 
 int main (void)
 {
-
-    unsigned long int randomnum;    /* numero casuale */
     unsigned int rand;
 
     int shuffleMode;
@@ -126,7 +125,7 @@ int main (void)
     
     FILE *fInfo;        /* file delle informazioni */
 
-    randomnum = 1;
+
     loop = choice = shuffleMode = timeShown = 0;
 
     track.trackName = NULL;
@@ -205,10 +204,6 @@ int main (void)
         wattroff (menu_win, A_BOLD);
         box (menu_win, 0, 0);
 
-        /* genero un numero casuale */
-        randomnum = randomnum * 1103515245 + 12345;
-        rand = (unsigned int) (randomnum / 65536) % (n_choices + 1);
-
         /* pulisco la barra degli avvertimenti */
         if ((c = wgetch (menu_win)) != ERR)
         {
@@ -280,7 +275,7 @@ int main (void)
 
                     /* traccia casuale */
                     case KEY_F(3):
-                        if (rand > 0)
+                        if ((rand = randInt (n_choices)) > 0)
                             trackindex = highlight = choice = rand;
                         else
                             trackindex = highlight = choice = 1;
@@ -457,7 +452,7 @@ int main (void)
                 }
                 else
                 {
-                    if (rand > 0)
+                    if ((rand = randInt (n_choices)) > 0)
                         highlight = choice = trackindex = rand;
                     else
                         highlight = choice = trackindex = 1;
@@ -513,6 +508,11 @@ int main (void)
     return 0;
 }
 
+int randInt (int range)
+{  
+    return ((unsigned int) (randomnum *= 1103515245 + 12345) / 65536) % (range + 1);
+}
+
 void playSong (char *songTitle, int trackIndex, int trackTotal)
 {
     char *localBuffer;
@@ -545,6 +545,7 @@ void playSong (char *songTitle, int trackIndex, int trackTotal)
 
     track.group_index = trackIndex;
     track.group_total = trackTotal;
+    free (localBuffer);
 
     return ;
 }
@@ -1425,15 +1426,6 @@ void displayplaylists ()
     box (opts_win, 0, 0);
     wrefresh (opts_win);
     
-/*  Se voglio reimplementare la barra separata per le playlist
-    if (trackplaying)
-    {
-        local_info_win = newwin (4, WIDTH, starty - 5, startx);
-        box (local_info_win, 0, 0);
-        wrefresh (local_info_win);
-    }
-    else
-*/
     local_info_win = info_win;
 
     wattron (play_win, A_BOLD);
@@ -2097,8 +2089,7 @@ void info_win_global_update (int current, int total)
 
 
     werase (info_win);
-
-    wmove (info_win, 1, 2);
+    wprintw (info_win, "%d/%d", current, total);
     wprintw (info_win, "%d/%d", current, total);
 
     if (!trackplaying)
